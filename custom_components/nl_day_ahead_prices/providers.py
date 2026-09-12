@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Awaitable, Callable
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
 from xml.etree import ElementTree
@@ -56,6 +57,14 @@ class BasePriceProvider(ABC):
     async def async_fetch(self, today: date, tomorrow: date) -> ProviderResult:
         """Fetch normalized today and tomorrow prices."""
 
+    async def _fetch_optional_day(self, day: date, fetch_day: Callable[[date], Awaitable[Any]]) -> Any | None:
+        """Fetch one day's raw payload, tolerating it not being published yet."""
+        try:
+            return await fetch_day(day)
+        except ProviderError as err:
+            _LOGGER.debug("%s: prices for %s not yet available: %s", self.key, day, err)
+            return None
+
     async def _request_json(self, url: str, params: dict[str, Any] | None = None) -> Any:
         """Fetch JSON with timeout and retry."""
         last_error: Exception | None = None
@@ -64,9 +73,6 @@ class BasePriceProvider(ABC):
                 async with asyncio.timeout(REQUEST_TIMEOUT):
                     async with self.session.get(url, params=params) as response:
                         response.raise_for_status()
-                        # ValueError also covers json.JSONDecodeError, which aiohttp
-                        # raises (not a ClientError) when a provider answers with an
-                        # empty/non-JSON body, e.g. a 204 for a not-yet-published day.
                         data = await response.json(content_type=None)
                         if data is None:
                             raise ValueError("empty JSON response")
@@ -100,9 +106,11 @@ class NordPoolProvider(BasePriceProvider):
 
     async def async_fetch(self, today: date, tomorrow: date) -> ProviderResult:
         today_raw = await self._fetch_day(today)
-        tomorrow_raw = await self._fetch_day(tomorrow)
         prices_today = parse_nord_pool(today_raw, self.country)
-        prices_tomorrow = parse_nord_pool(tomorrow_raw, self.country)
+
+        tomorrow_raw = await self._fetch_optional_day(tomorrow, self._fetch_day)
+        prices_tomorrow = parse_nord_pool(tomorrow_raw, self.country) if tomorrow_raw is not None else []
+
         return ProviderResult(
             provider=self.key,
             prices_today=prices_today,
@@ -130,8 +138,7 @@ class EnergyChartsProvider(BasePriceProvider):
     key = PROVIDER_ENERGY_CHARTS
 
     async def async_fetch(self, today: date, tomorrow: date) -> ProviderResult:
-        # Use aware NL-local midnights (not naive UTC-ish ones) so the request
-        # window actually covers the full local days being asked for.
+        # Use aware NL-local midnights
         start = datetime.combine(today, time.min, tzinfo=NL_ZONE).isoformat()
         end = datetime.combine(tomorrow + timedelta(days=1), time.min, tzinfo=NL_ZONE).isoformat()
         raw = await self._request_json(
@@ -167,9 +174,11 @@ class EntsoeProvider(BasePriceProvider):
 
     async def async_fetch(self, today: date, tomorrow: date) -> ProviderResult:
         today_raw = await self._fetch_day(today)
-        tomorrow_raw = await self._fetch_day(tomorrow)
         prices_today = parse_entsoe_xml(today_raw)
-        prices_tomorrow = parse_entsoe_xml(tomorrow_raw)
+
+        tomorrow_raw = await self._fetch_optional_day(tomorrow, self._fetch_day)
+        prices_tomorrow = parse_entsoe_xml(tomorrow_raw) if tomorrow_raw is not None else []
+
         return ProviderResult(
             provider=self.key,
             prices_today=prices_today,

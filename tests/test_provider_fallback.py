@@ -5,6 +5,7 @@ import pytest
 from custom_components.nl_day_ahead_prices.models import PriceEntry, ProviderResult
 from custom_components.nl_day_ahead_prices.providers import (
     BasePriceProvider,
+    EntsoeProvider,
     NordPoolProvider,
     ProviderError,
     async_fetch_with_fallback,
@@ -50,8 +51,8 @@ async def test_provider_fallback_raises_when_every_provider_fails() -> None:
 
 @pytest.mark.asyncio
 async def test_nord_pool_tolerates_unpublished_tomorrow(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Nord Pool only publishes tomorrow's prices in the afternoon; that
-    alone shouldn't fail the whole provider and trigger a fallback."""
+    """Day-ahead providers only publish tomorrow's prices in the afternoon;
+    that alone shouldn't fail the whole provider and trigger a fallback."""
     provider = NordPoolProvider(session=None, country="NL", currency="EUR")
 
     async def fake_fetch_day(day: date) -> dict:
@@ -69,4 +70,46 @@ async def test_nord_pool_tolerates_unpublished_tomorrow(monkeypatch: pytest.Monk
 
     assert len(result.prices_today) == 1
     assert result.prices_tomorrow == []
+
+
+@pytest.mark.asyncio
+async def test_entsoe_tolerates_unpublished_tomorrow(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The same "not yet published" tolerance applies to every provider that
+    fetches today and tomorrow as separate requests, not just Nord Pool."""
+    provider = EntsoeProvider(session=None, api_token="token", country="NL", currency="EUR")
+
+    today_xml = """<Publication_MarketDocument>
+        <TimeSeries>
+            <Period>
+                <timeInterval><start>2026-07-02T00:00Z</start></timeInterval>
+                <resolution>PT60M</resolution>
+                <Point><position>1</position><price.amount>100</price.amount></Point>
+            </Period>
+        </TimeSeries>
+    </Publication_MarketDocument>"""
+
+    async def fake_fetch_day(day: date) -> str:
+        if day == date(2026, 7, 3):
+            raise ProviderError("empty response")
+        return today_xml
+
+    monkeypatch.setattr(provider, "_fetch_day", fake_fetch_day)
+
+    result = await provider.async_fetch(date(2026, 7, 2), date(2026, 7, 3))
+
+    assert len(result.prices_today) == 1
+    assert result.prices_tomorrow == []
+    assert result.raw_tomorrow is None
+
+
+@pytest.mark.asyncio
+async def test_fetch_optional_day_returns_none_on_provider_error() -> None:
+    """The shared tolerance helper swallows ProviderError for a single day
+    without raising, so any provider can opt in by using it for tomorrow."""
+    provider = NordPoolProvider(session=None, country="NL", currency="EUR")
+
+    async def failing(day: date) -> dict:
+        raise ProviderError("not published yet")
+
+    assert await provider._fetch_optional_day(date(2026, 7, 3), failing) is None
 
