@@ -177,6 +177,7 @@
   "entity": {
     "sensor": {
       "current_market_price": { "name": "Huidige Marktprijs" },
+      "current_sell_price": { "name": "Huidige Terugleverprijs" },
       "next_hour_market_price": { "name": "Volgende Marktprijs" },
       "average_price_today": { "name": "Gemiddelde Prijs Vandaag" },
       "average_price_tomorrow": { "name": "Gemiddelde Prijs Morgen" },

@@ -177,6 +177,7 @@
   "entity": {
     "sensor": {
       "current_market_price": { "name": "Current Market Price" },
+      "current_sell_price": { "name": "Current Sell Price" },
       "next_hour_market_price": { "name": "Next Market Price" },
       "average_price_today": { "name": "Average Price Today" },
       "average_price_tomorrow": { "name": "Average Price Tomorrow" },

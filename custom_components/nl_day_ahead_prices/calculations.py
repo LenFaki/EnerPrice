@@ -61,6 +61,30 @@ def build_all_in_price_attributes(
     ]
 
 
+def calculate_sell_price(
+    market_price: float,
+    supplier_profile: SupplierProfile | dict[str, Any] | None,
+    vat: float,
+) -> float:
+    """Calculate the feed-in (export) price in EUR/kWh."""
+    return market_price * (1 + vat) - calculate_supplier_export_fee(supplier_profile, vat)
+
+
+def build_sell_price_attributes(
+    prices: list[Any],
+    supplier_profile: SupplierProfile | dict[str, Any] | None,
+    vat: float,
+) -> list[dict[str, Any]]:
+    """Build ApexCharts-friendly sell (export) price attributes."""
+    return [
+        {
+            "time": price.time.isoformat(),
+            "price": round(calculate_sell_price(price.price, supplier_profile, vat), 6),
+        }
+        for price in prices
+    ]
+
+
 def normalize_supplier_profile(profile: SupplierProfile | dict[str, Any] | None) -> SupplierProfile | None:
     """Normalize supplier profiles passed to calculations."""
     if profile is None:
