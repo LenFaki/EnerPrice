@@ -77,26 +77,26 @@ def _supplier_profile(**overrides: object) -> SupplierProfile:
     return SupplierProfile(**defaults)
 
 
-def test_sell_price_subtracts_export_and_feed_in_fee() -> None:
+def test_sell_price_adds_export_and_feed_in_fee() -> None:
     profile = _supplier_profile(purchase_fee_export=0.02, feed_in_fee=0.01, sell_fee_includes_vat=True)
 
-    assert calculate_sell_price(0.1, profile, 0.21) == pytest.approx(0.1 * 1.21 - 0.03)
+    assert calculate_sell_price(0.1, profile, 0.21) == pytest.approx(0.1 + 0.03)
 
 
-def test_sell_price_grosses_up_export_fee_when_it_excludes_vat() -> None:
+def test_sell_price_grosses_up_export_fee_excl_vat() -> None:
     profile = _supplier_profile(purchase_fee_export=0.02, sell_fee_includes_vat=False)
 
-    assert calculate_sell_price(0.1, profile, 0.21) == pytest.approx(0.1 * 1.21 - 0.02 * 1.21)
+    assert calculate_sell_price(0.1, profile, 0.21) == pytest.approx(0.1 + 0.02 * 1.21)
 
 
-def test_sell_price_without_supplier_profile_is_market_price_including_vat() -> None:
-    assert calculate_sell_price(0.1, None, 0.21) == pytest.approx(0.121)
+def test_sell_price_without_profile_is_market_price() -> None:
+    assert calculate_sell_price(0.1, None, 0.21) == pytest.approx(0.1)
 
 
-def test_build_sell_price_attributes_formats_time_and_rounds_price() -> None:
+def test_build_sell_price_attributes() -> None:
     prices = [PriceEntry(datetime(2026, 7, 2, 10, tzinfo=timezone.utc), 0.1)]
     profile = _supplier_profile(purchase_fee_export=0.02)
 
     result = build_sell_price_attributes(prices, profile, 0.21)
 
-    assert result == [{"time": "2026-07-02T10:00:00+00:00", "price": round(0.1 * 1.21 - 0.02, 6)}]
+    assert result == [{"time": "2026-07-02T10:00:00+00:00", "price": round(0.1 + 0.02, 6)}]

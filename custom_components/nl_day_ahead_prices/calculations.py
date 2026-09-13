@@ -67,7 +67,7 @@ def calculate_sell_price(
     vat: float,
 ) -> float:
     """Calculate the feed-in (export) price in EUR/kWh."""
-    return market_price * (1 + vat) - calculate_supplier_export_fee(supplier_profile, vat)
+    return market_price + calculate_supplier_export_fee(supplier_profile, vat)
 
 
 def build_sell_price_attributes(

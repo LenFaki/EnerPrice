@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers import config_validation as cv
 from homeassistant.util import dt as dt_util
 
-from .calculations import calculate_all_in_price, calculate_supplier_export_fee
+from .calculations import calculate_all_in_price, calculate_sell_price
 from .const import DOMAIN
 from .dashboard import generate_automation_yaml, generate_dashboard_yaml
 from .models import PriceEntry
@@ -168,8 +168,12 @@ def _prices(coordinator, price_type: str, include_sell_fee: bool) -> list[PriceE
     if price_type == "market":
         return coordinator.data.result.prices
     if price_type == "sell":
-        fee = calculate_supplier_export_fee(profile, _vat(entry)) if include_sell_fee else 0.0
-        return [PriceEntry(item.time, item.price * (1 + _vat(entry)) - fee) for item in coordinator.data.result.prices]
+        if not include_sell_fee:
+            return [PriceEntry(item.time, item.price) for item in coordinator.data.result.prices]
+        return [
+            PriceEntry(item.time, calculate_sell_price(item.price, profile, _vat(entry)))
+            for item in coordinator.data.result.prices
+        ]
     return [
         PriceEntry(item.time, calculate_all_in_price(item.price, _energy_tax(entry), profile, _vat(entry)))
         for item in coordinator.data.result.prices
