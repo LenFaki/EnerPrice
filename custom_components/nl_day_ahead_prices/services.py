@@ -7,9 +7,8 @@ from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers import config_validation as cv
 
 from .analysis.chart_export import apexcharts_yaml, export_prices
-from .calculations import calculate_all_in_price
+from .calculations import all_in_entries_for_supplier
 from .const import DOMAIN
-from .models import PriceEntry
 from .sensor import _energy_tax, _selected_supplier_profile, _vat
 
 EXPORT_SERVICE = "export_chart_data"
@@ -32,6 +31,21 @@ def async_register_services(hass: HomeAssistant) -> None:
     from .services_v2 import async_register_v2_services
 
     async_register_v2_services(hass)
+    if not hass.services.has_service(DOMAIN, "get_daily_forecast"):
+        async def async_daily_forecast(call: ServiceCall) -> dict:
+            coordinator = _coordinator(hass)
+            daily = getattr(coordinator, "daily_forecast", None)
+            if daily is None:
+                return {"enabled": False, "days": [], "series": []}
+            # Return a copy; response consumers cannot mutate coordinator data.
+            from copy import deepcopy
+
+            return {"enabled": True, **deepcopy(daily.snapshot())}
+
+        hass.services.async_register(
+            DOMAIN, "get_daily_forecast", async_daily_forecast,
+            schema=vol.Schema({}), supports_response=SupportsResponse.ONLY,
+        )
     if hass.services.has_service(DOMAIN, EXPORT_SERVICE):
         return
 
@@ -47,13 +61,9 @@ def async_register_services(hass: HomeAssistant) -> None:
             prices.extend(data.result.prices_tomorrow)
         if call.data["price_type"] == "all_in":
             entry = coordinator.entry
-            prices = [
-                PriceEntry(
-                    item.time,
-                    calculate_all_in_price(item.price, _energy_tax(entry), _selected_supplier_profile(entry), _vat(entry)),
-                )
-                for item in prices
-            ]
+            prices = all_in_entries_for_supplier(
+                prices, _energy_tax(entry), _selected_supplier_profile(entry), _vat(entry)
+            )
         from .analysis.periods import find_price_periods
         from .const import (
             CONF_BEST_PERIOD_DURATION,
@@ -90,6 +100,7 @@ def async_unregister_services(hass: HomeAssistant) -> None:
     """Remove services when the final entry unloads."""
     hass.services.async_remove(DOMAIN, EXPORT_SERVICE)
     hass.services.async_remove(DOMAIN, CONFIG_SERVICE)
+    hass.services.async_remove(DOMAIN, "get_daily_forecast")
     from .services_v2 import async_unregister_v2_services
 
     async_unregister_v2_services(hass)

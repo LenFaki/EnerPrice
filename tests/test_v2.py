@@ -91,6 +91,87 @@ def test_advisor_uses_dutch_user_facing_text() -> None:
     assert "EV laden" in result["best_actions"]
 
 
+
+def test_advisor_exposes_next_better_price_context() -> None:
+    now = datetime(2026, 7, 9, 10, 0, tzinfo=timezone.utc)
+    prices = _prices([0.30, 0.29, 0.20, 0.10], start=now)
+    result = build_price_advice(
+        current_price=0.20,
+        all_in_price=0.30,
+        score={"score": 30},
+        rating="expensive",
+        trend="falling",
+        volatility="moderate",
+        language="nl",
+        prices=prices,
+        now=now,
+    )
+    assert result["next_better_time"] == prices[2].time
+    assert result["next_better_price"] == pytest.approx(0.20)
+    assert result["minutes_until_better"] == 120
+    assert result["savings_percent"] == pytest.approx(33.3)
+    assert result["best_upcoming_time"] == prices[3].time
+    assert "Wacht" in result["summary"]
+
+
+def test_advisor_summary_recommends_using_good_price_now() -> None:
+    now = datetime(2026, 7, 9, 10, 0, tzinfo=timezone.utc)
+    result = build_price_advice(
+        current_price=0.05,
+        all_in_price=0.10,
+        score={"score": 95},
+        rating="very_cheap",
+        trend="stable",
+        volatility="low",
+        language="nl",
+        prices=_prices([0.10, 0.20, 0.30], start=now),
+        now=now,
+    )
+    assert result["state"] == "excellent"
+    assert result["next_better_time"] is None
+    assert "Goed moment" in result["summary"]
+
+
+def test_advisor_handles_negative_prices_without_percentage_math() -> None:
+    now = datetime(2026, 7, 9, 10, 0, tzinfo=timezone.utc)
+    prices = _prices([-0.02, -0.03, -0.04], minutes=15, start=now)
+    result = build_price_advice(
+        current_price=-0.02,
+        all_in_price=-0.02,
+        score={"score": 95},
+        rating="very_cheap",
+        trend="falling",
+        volatility="moderate",
+        language="nl",
+        prices=prices,
+        now=now,
+    )
+    assert result["state"] == "excellent"
+    assert result["next_better_time"] == prices[1].time
+    assert result["next_better_price"] == pytest.approx(-0.03)
+    assert result["minutes_until_better"] == 15
+    assert result["savings_percent"] is None
+    assert "Goed moment" in result["summary"]
+
+
+def test_advisor_uses_quarter_hour_wait_time() -> None:
+    now = datetime(2026, 7, 9, 10, 7, tzinfo=timezone.utc)
+    prices = _prices([0.30, 0.20, 0.19], minutes=15, start=datetime(2026, 7, 9, 10, 0, tzinfo=timezone.utc))
+    result = build_price_advice(
+        current_price=0.30,
+        all_in_price=0.30,
+        score={"score": 30},
+        rating="expensive",
+        trend="falling",
+        volatility="low",
+        language="nl",
+        prices=prices,
+        now=now,
+    )
+    assert result["next_better_time"] == prices[1].time
+    assert result["minutes_until_better"] == 8
+    assert result["savings_percent"] == pytest.approx(33.3)
+
 def test_ev_planner_consecutive_hourly() -> None:
     prices = _prices([0.4, 0.1, 0.2, 0.5])
     result = plan_ev_charging(
@@ -178,8 +259,34 @@ def test_appliance_planner_returns_automation() -> None:
 def test_dashboard_yaml_generation() -> None:
     generated = generate_dashboard_yaml("full", include_ev_planner=True)
     assert "title: EnerPrice" in generated
+    assert "type: sections" in generated
+    assert "EnerPrice Advisor" in generated
+    assert "next_better_time" in generated
     assert "custom:apexcharts-card" in generated
     assert "sensor.nl_day_ahead_price_advisor" in generated
+
+
+
+def test_dashboard_yaml_accepts_resolved_entity_ids() -> None:
+    generated = generate_dashboard_yaml(
+        "compact",
+        entity_ids={
+            "price_advisor": "sensor.meterkast_price_advisor",
+            "price_score": "sensor.meterkast_price_score",
+            "current_all_in_price": "sensor.meterkast_current_all_in_price",
+        },
+    )
+    assert "sensor.meterkast_price_advisor" in generated
+    assert "sensor.meterkast_price_score" in generated
+    assert "sensor.meterkast_current_all_in_price" in generated
+    assert "states('sensor.meterkast_price_advisor')" in generated
+
+def test_compact_dashboard_uses_native_advisor_blocks_without_chart() -> None:
+    generated = generate_dashboard_yaml("compact")
+    assert "type: tile" in generated
+    assert "type: markdown" in generated
+    assert "custom:apexcharts-card" not in generated
+    assert "max_columns: 1" in generated
 
 
 def test_automation_yaml_generation() -> None:
@@ -258,6 +365,7 @@ def test_english_and_dutch_ui_translations_have_equal_coverage() -> None:
 
     assert keys(english) == keys(dutch)
     assert set(dutch["services"]) == {
+        "get_daily_forecast",
         "export_chart_data",
         "generate_apexcharts_config",
         "find_best_charging_window",

@@ -27,18 +27,25 @@
           "enable_entsoe": "Enable optional ENTSO-E fallback",
           "entsoe_api_token": "ENTSO-E API token",
           "selected_supplier": "Supplier",
+          "daily_advisor_enabled": "Enable Daily Advisor (preview)",
+          "supplier_tariff_updates": "Supplier tariff updates",
           "price_resolution": "Price interval",
           "energy_tax": "Energy tax per kWh",
           "energy_tax_incl_vat": "Energy tax including VAT",
           "supplier_markup_excl_vat": "Supplier markup excluding VAT",
           "vat": "VAT"
-        },
-        "options": {
-          "price_resolution": {
-            "auto": "Automatic based on supplier",
-            "hourly": "Hourly prices",
-            "quarter_hour": "Quarter-hour prices"
-          }
+        }
+      },
+      "daily_advisor": {
+        "title": "Daily Advisor: solar forecasts",
+        "description": "Daily consumption windows and solar forecasts, without device control or notifications. Uses appliance power from Smart Setup and the duration configured here. Select only today's and tomorrow's Forecast.Solar daily totals. Optional fresh grid and solar power measurements enable a conditional solar scenario; production is not surplus.",
+        "data": {
+          "daily_solar_power_entity": "Actual solar power (at most one sensor, W/kW)",
+          "daily_duration_minutes": "Flexible appliance duration",
+          "daily_forecast_entities": "Forecast.Solar daily totals",
+          "daily_grid_power_entity": "Grid power (at most one sensor, W/kW)",
+          "daily_solar_energy_entity": "Actual solar energy (at most one sensor, Wh/kWh)",
+          "daily_consumption_entities": "Consumption meters (Wh/kWh)"
         }
       },
       "supplier_summary": {
@@ -56,25 +63,99 @@
           "custom_sell_fee_electricity": "Electricity sell fee",
           "custom_sell_fee_includes_vat": "Sell fee includes VAT"
         }
+      },
+      "smart_setup": {
+        "title": "Smart Energy setup",
+        "description": "Optional: select Home Assistant measurements and one flexible device for automatic Smart Energy advice. EnerPrice remains advisory and does not switch devices.",
+        "data": {
+          "smart_setup_enabled": "Enable Smart Energy Setup",
+          "smart_grid_power_entity": "Grid / P1 power sensor",
+          "smart_solar_power_entity": "Actual solar production",
+          "smart_gas_price_entity": "Current gas price",
+          "smart_flexible_load_name": "Flexible device name",
+          "smart_flexible_load_power_w": "Flexible device power",
+          "smart_electric_efficiency": "Electric efficiency",
+          "smart_gas_efficiency": "Gas efficiency",
+          "smart_gas_kwh_per_m3": "Gas energy content",
+          "smart_solar_surplus_threshold_w": "Solar surplus threshold",
+          "smart_advice_language": "Advice language"
+        },
+        "data_description": {
+          "smart_setup_enabled": "Enables the Smart Energy Advisor. Disabling it preserves your settings for later.",
+          "smart_flexible_load_name": "A device whose use can be shifted, such as an electric water heater, EV charger, heat pump or other flexible appliance.",
+          "smart_flexible_load_power_w": "Electrical power draw of the flexible device in watts (W).",
+          "smart_grid_power_entity": "Current total grid power in W. Positive is import; negative is export.",
+          "smart_solar_power_entity": "Optional current total solar production in W. With multiple inverters, use a combined template sensor. May be left empty with a usable grid/P1 sensor.",
+          "smart_gas_price_entity": "Optional current gas price in EUR/m³ for gas-versus-electric heat comparison.",
+          "smart_electric_efficiency": "Efficiency/COP of electric heating. Use 1.0 for direct resistance heating.",
+          "smart_gas_efficiency": "Estimated gas-heating efficiency as a fraction, for example 0.90 for 90%.",
+          "smart_gas_kwh_per_m3": "Energy content of gas in kWh per m³ used for useful-heat cost comparison.",
+          "smart_solar_surplus_threshold_w": "Minimum meaningful measured solar surplus in W before EnerPrice treats it as partial surplus.",
+          "smart_advice_language": "Language used for Smart Energy Advisor recommendations."
+        }
       }
     },
     "error": {
+      "daily_invalid_duration": "Choose 15 to 1440 minutes, in steps of 15 minutes.",
+      "daily_invalid_forecast": "Select only today's or tomorrow's total energy from Forecast.Solar.",
+      "daily_duplicate_forecast": "The same installation and day were selected more than once.",
+      "daily_invalid_unit": "Sensor missing or incorrect device class or unit.",
+      "daily_too_many_entities": "Select at most eight installations or consumption meters.",
+      "daily_single_entity": "Select at most one sensor, or clear the selection.",
       "invalid_vat": "VAT must be between 0 and 1",
       "negative_value": "This value cannot be negative",
-      "supplier_profile_unavailable": "The selected supplier profile is unavailable"
+      "supplier_profile_unavailable": "The selected supplier profile is unavailable",
+      "positive_value_required": "This value must be greater than zero"
+    }
+  },
+  "selector": {
+    "supplier_tariff_updates": {
+      "options": {
+        "automatic": "Automatic (recommended)",
+        "bundled": "Bundled only"
+      }
+    },
+    "price_resolution": {
+      "options": {
+        "auto": "Automatic based on supplier",
+        "hourly": "Hourly prices",
+        "quarter_hour": "Quarter-hour prices"
+      }
     }
   },
   "services": {
+    "get_daily_forecast": {
+      "name": "Get daily solar forecast",
+      "description": "Returns locally available solar forecasts and measurements. Does not request APIs or calculate savings."
+    },
     "export_chart_data": {
       "name": "Export chart data",
       "description": "Export market or all-in prices for ApexCharts.",
       "fields": {
-        "include_today": { "name": "Include today", "description": "Include today's prices." },
-        "include_tomorrow": { "name": "Include tomorrow", "description": "Include available prices for tomorrow." },
-        "price_type": { "name": "Price type", "description": "Use market or all-in prices." },
-        "resolution": { "name": "Price resolution", "description": "Choose automatic, hourly, or quarter-hour values." },
-        "include_best_periods": { "name": "Include best periods", "description": "Include the cheapest periods." },
-        "include_peak_periods": { "name": "Include peak periods", "description": "Include the most expensive periods." }
+        "include_today": {
+          "name": "Include today",
+          "description": "Include today's prices."
+        },
+        "include_tomorrow": {
+          "name": "Include tomorrow",
+          "description": "Include available prices for tomorrow."
+        },
+        "price_type": {
+          "name": "Price type",
+          "description": "Use market or all-in prices."
+        },
+        "resolution": {
+          "name": "Price resolution",
+          "description": "Choose automatic, hourly, or quarter-hour values."
+        },
+        "include_best_periods": {
+          "name": "Include best periods",
+          "description": "Include the cheapest periods."
+        },
+        "include_peak_periods": {
+          "name": "Include peak periods",
+          "description": "Include the most expensive periods."
+        }
       }
     },
     "generate_apexcharts_config": {
@@ -85,127 +166,362 @@
       "name": "Find best EV charging window",
       "description": "Find the cheapest charging intervals before a deadline.",
       "fields": {
-        "target_energy_kwh": { "name": "Target energy", "description": "Energy the vehicle needs to charge." },
-        "max_power_kw": { "name": "Maximum charging power", "description": "Maximum power of the charger." },
-        "earliest_start": { "name": "Earliest start", "description": "Optional time charging may begin." },
-        "deadline": { "name": "Deadline", "description": "Time charging must be complete." },
-        "price_type": { "name": "Price type", "description": "Plan with market or all-in prices." },
-        "require_consecutive": { "name": "Consecutive charging", "description": "Use one consecutive charging period." },
-        "minimum_session_minutes": { "name": "Minimum session duration", "description": "Minimum duration of one charging session." },
-        "allow_split_sessions": { "name": "Allow split sessions", "description": "Split charging across multiple cheap periods." },
-        "round_to_resolution": { "name": "Round to price resolution", "description": "Round duration to hourly or quarter-hour boundaries." }
+        "target_energy_kwh": {
+          "name": "Target energy",
+          "description": "Energy the vehicle needs to charge."
+        },
+        "max_power_kw": {
+          "name": "Maximum charging power",
+          "description": "Maximum power of the charger."
+        },
+        "earliest_start": {
+          "name": "Earliest start",
+          "description": "Optional time charging may begin."
+        },
+        "deadline": {
+          "name": "Deadline",
+          "description": "Time charging must be complete."
+        },
+        "price_type": {
+          "name": "Price type",
+          "description": "Plan with market or all-in prices."
+        },
+        "require_consecutive": {
+          "name": "Consecutive charging",
+          "description": "Use one consecutive charging period."
+        },
+        "minimum_session_minutes": {
+          "name": "Minimum session duration",
+          "description": "Minimum duration of one charging session."
+        },
+        "allow_split_sessions": {
+          "name": "Allow split sessions",
+          "description": "Split charging across multiple cheap periods."
+        },
+        "round_to_resolution": {
+          "name": "Round to price resolution",
+          "description": "Round duration to hourly or quarter-hour boundaries."
+        }
       }
     },
     "find_best_heating_window": {
       "name": "Find best heating window",
       "description": "Plan the cheapest boiler or heat-pump boiler period.",
       "fields": {
-        "duration_minutes": { "name": "Duration", "description": "Required heating duration in minutes." },
-        "earliest_start": { "name": "Earliest start", "description": "Optional time heating may begin." },
-        "deadline": { "name": "Deadline", "description": "Time heating must be complete." },
-        "prefer_before_peak": { "name": "Prefer before peak", "description": "Prefer a period before the next price peak." },
-        "price_type": { "name": "Price type", "description": "Plan with market or all-in prices." },
-        "minimum_gap_minutes": { "name": "Minimum gap", "description": "Minimum gap before the price peak." }
+        "duration_minutes": {
+          "name": "Duration",
+          "description": "Required heating duration in minutes."
+        },
+        "earliest_start": {
+          "name": "Earliest start",
+          "description": "Optional time heating may begin."
+        },
+        "deadline": {
+          "name": "Deadline",
+          "description": "Time heating must be complete."
+        },
+        "prefer_before_peak": {
+          "name": "Prefer before peak",
+          "description": "Prefer a period before the next price peak."
+        },
+        "price_type": {
+          "name": "Price type",
+          "description": "Plan with market or all-in prices."
+        },
+        "minimum_gap_minutes": {
+          "name": "Minimum gap",
+          "description": "Minimum gap before the price peak."
+        }
       }
     },
     "find_battery_strategy": {
       "name": "Find battery strategy",
       "description": "Find efficiency-aware charge and discharge windows.",
       "fields": {
-        "battery_capacity_kwh": { "name": "Battery capacity", "description": "Total usable battery capacity." },
-        "current_soc_percent": { "name": "Current charge", "description": "Current state of charge percentage." },
-        "min_soc_percent": { "name": "Minimum charge", "description": "Lower state of charge limit." },
-        "max_soc_percent": { "name": "Maximum charge", "description": "Upper state of charge limit." },
-        "charge_power_kw": { "name": "Charging power", "description": "Maximum battery charging power." },
-        "discharge_power_kw": { "name": "Discharging power", "description": "Maximum battery discharging power." },
-        "roundtrip_efficiency_percent": { "name": "Round-trip efficiency", "description": "Efficiency of one complete battery cycle." },
-        "price_type": { "name": "Price type", "description": "Optimize with market or all-in prices." },
-        "allow_grid_charge": { "name": "Allow grid charging", "description": "Allow charging during cheap grid prices." },
-        "allow_export": { "name": "Allow export", "description": "Allow discharging to the electricity grid." }
+        "battery_capacity_kwh": {
+          "name": "Battery capacity",
+          "description": "Total usable battery capacity."
+        },
+        "current_soc_percent": {
+          "name": "Current charge",
+          "description": "Current state of charge percentage."
+        },
+        "min_soc_percent": {
+          "name": "Minimum charge",
+          "description": "Lower state of charge limit."
+        },
+        "max_soc_percent": {
+          "name": "Maximum charge",
+          "description": "Upper state of charge limit."
+        },
+        "charge_power_kw": {
+          "name": "Charging power",
+          "description": "Maximum battery charging power."
+        },
+        "discharge_power_kw": {
+          "name": "Discharging power",
+          "description": "Maximum battery discharging power."
+        },
+        "roundtrip_efficiency_percent": {
+          "name": "Round-trip efficiency",
+          "description": "Efficiency of one complete battery cycle."
+        },
+        "price_type": {
+          "name": "Price type",
+          "description": "Optimize with market or all-in prices."
+        },
+        "allow_grid_charge": {
+          "name": "Allow grid charging",
+          "description": "Allow charging during cheap grid prices."
+        },
+        "allow_export": {
+          "name": "Allow export",
+          "description": "Allow discharging to the electricity grid."
+        }
       }
     },
     "find_best_export_window": {
       "name": "Find best export window",
       "description": "Find the most valuable solar export period.",
       "fields": {
-        "expected_export_kwh": { "name": "Expected export", "description": "Optional amount of energy to export." },
-        "duration_minutes": { "name": "Duration", "description": "Required export duration." },
-        "price_type": { "name": "Price type", "description": "Use market, all-in, or sell prices." },
-        "include_supplier_sell_fee": { "name": "Include supplier sell fee", "description": "Apply the supplier's export fee." }
+        "expected_export_kwh": {
+          "name": "Expected export",
+          "description": "Optional amount of energy to export."
+        },
+        "duration_minutes": {
+          "name": "Duration",
+          "description": "Required export duration."
+        },
+        "price_type": {
+          "name": "Price type",
+          "description": "Use market, all-in, or sell prices."
+        },
+        "include_supplier_sell_fee": {
+          "name": "Include supplier sell fee",
+          "description": "Apply the supplier's export fee."
+        }
       }
     },
     "find_best_appliance_window": {
       "name": "Find best appliance window",
       "description": "Plan a washer, dishwasher, dryer, pump, or heating load.",
       "fields": {
-        "appliance_name": { "name": "Appliance name", "description": "Name of the appliance to plan." },
-        "duration_minutes": { "name": "Duration", "description": "Required operating duration." },
-        "earliest_start": { "name": "Earliest start", "description": "Optional time the appliance may start." },
-        "deadline": { "name": "Deadline", "description": "Time the appliance must be finished." },
-        "energy_kwh": { "name": "Energy use", "description": "Optional expected energy consumption." },
-        "require_consecutive": { "name": "Consecutive period", "description": "Plan one uninterrupted operating period." },
-        "avoid_peak_periods": { "name": "Avoid peak periods", "description": "Avoid the most expensive price intervals." }
+        "appliance_name": {
+          "name": "Appliance name",
+          "description": "Name of the appliance to plan."
+        },
+        "duration_minutes": {
+          "name": "Duration",
+          "description": "Required operating duration."
+        },
+        "earliest_start": {
+          "name": "Earliest start",
+          "description": "Optional time the appliance may start."
+        },
+        "deadline": {
+          "name": "Deadline",
+          "description": "Time the appliance must be finished."
+        },
+        "energy_kwh": {
+          "name": "Energy use",
+          "description": "Optional expected energy consumption."
+        },
+        "require_consecutive": {
+          "name": "Consecutive period",
+          "description": "Plan one uninterrupted operating period."
+        },
+        "avoid_peak_periods": {
+          "name": "Avoid peak periods",
+          "description": "Avoid the most expensive price intervals."
+        }
       }
     },
     "generate_dashboard_yaml": {
       "name": "Generate EnerPrice dashboard",
       "description": "Generate Lovelace YAML to paste manually into a dashboard.",
       "fields": {
-        "dashboard_type": { "name": "Dashboard type", "description": "Choose a compact, full, or advisor dashboard." },
-        "include_market_price": { "name": "Show market price", "description": "Include the current market price." },
-        "include_all_in_price": { "name": "Show all-in price", "description": "Include the current all-in price." },
-        "include_supplier_info": { "name": "Show supplier", "description": "Include supplier and tariff information." },
-        "include_best_periods": { "name": "Show best periods", "description": "Include cheap and expensive periods." },
-        "include_price_advisor": { "name": "Show price advisor", "description": "Include price advice and score." },
-        "include_ev_planner": { "name": "Show EV planner", "description": "Include information about EV planning." },
-        "include_battery_strategy": { "name": "Show battery strategy", "description": "Include battery optimization information." },
-        "theme": { "name": "Theme", "description": "Choose automatic, light, or dark display." }
+        "include_daily_advisor": {"name": "Show Daily Advisor", "description": "Optional consumption windows, solar forecasts and three-day outlook."},
+        "use_apexcharts": {"name": "Use ApexCharts", "description": "Disable for a dashboard using only built-in cards."},
+        "dashboard_type": {
+          "name": "Dashboard type",
+          "description": "Choose a compact, full, or advisor dashboard."
+        },
+        "include_market_price": {
+          "name": "Show market price",
+          "description": "Include the current market price."
+        },
+        "include_all_in_price": {
+          "name": "Show all-in price",
+          "description": "Include the current all-in price."
+        },
+        "include_supplier_info": {
+          "name": "Show supplier",
+          "description": "Include supplier and tariff information."
+        },
+        "include_best_periods": {
+          "name": "Show best periods",
+          "description": "Include cheap and expensive periods."
+        },
+        "include_price_advisor": {
+          "name": "Show price advisor",
+          "description": "Include price advice and score."
+        },
+        "include_ev_planner": {
+          "name": "Show EV planner",
+          "description": "Include information about EV planning."
+        },
+        "include_battery_strategy": {
+          "name": "Show battery strategy",
+          "description": "Include battery optimization information."
+        },
+        "theme": {
+          "name": "Theme",
+          "description": "Choose automatic, light, or dark display."
+        }
       }
     },
     "generate_automation_yaml": {
       "name": "Generate EnerPrice automation",
       "description": "Generate editable Home Assistant automation YAML.",
       "fields": {
-        "automation_type": { "name": "Automation type", "description": "Choose the desired energy workflow." },
-        "target_entity": { "name": "Target entity", "description": "Entity controlled by the automation." },
-        "notify_service": { "name": "Notification service", "description": "Service for cheap or expensive price alerts." },
-        "duration_minutes": { "name": "Duration", "description": "Suggested operating duration." },
-        "deadline": { "name": "Deadline", "description": "Optional desired completion time." }
+        "automation_type": {
+          "name": "Automation type",
+          "description": "Choose the desired energy workflow."
+        },
+        "target_entity": {
+          "name": "Target entity",
+          "description": "Entity controlled by the automation."
+        },
+        "notify_service": {
+          "name": "Notification service",
+          "description": "Service for cheap or expensive price alerts."
+        },
+        "duration_minutes": {
+          "name": "Duration",
+          "description": "Suggested operating duration."
+        },
+        "deadline": {
+          "name": "Deadline",
+          "description": "Optional desired completion time."
+        }
       }
     }
   },
   "entity": {
     "sensor": {
-      "current_market_price": { "name": "Current Market Price" },
-      "current_sell_price": { "name": "Current Sell Price" },
-      "next_hour_market_price": { "name": "Next Market Price" },
-      "average_price_today": { "name": "Average Price Today" },
-      "average_price_tomorrow": { "name": "Average Price Tomorrow" },
-      "lowest_price_today": { "name": "Lowest Price Today" },
-      "lowest_energy_price": { "name": "Lowest Energy Price Time" },
-      "highest_price_today": { "name": "Highest Price Today" },
-      "highest_energy_price": { "name": "Highest Energy Price Time" },
-      "time_of_lowest_price_today": { "name": "Time Of Lowest Price Today" },
-      "time_of_highest_price_today": { "name": "Time Of Highest Price Today" },
-      "current_all_in_price": { "name": "Current All-in Price" },
-      "next_hour_all_in_price": { "name": "Next All-in Price" },
-      "average_all_in_price_today": { "name": "Average All-in Price Today" },
-      "lowest_all_in_price_today": { "name": "Lowest All-in Price Today" },
-      "highest_all_in_price_today": { "name": "Highest All-in Price Today" },
-      "supplier_purchase_fee": { "name": "Supplier Purchase Fee" },
-      "supplier_monthly_fee": { "name": "Supplier Monthly Fee" },
-      "selected_supplier": { "name": "Selected Supplier" },
-      "effective_price_resolution": { "name": "Effective Price Resolution" },
-      "current_provider": { "name": "Current Provider" },
-      "last_successful_update": { "name": "Last Successful Update" },
-      "next_1_hour_average_price": { "name": "Next 1 Hour Average Price" },
-      "next_2_hour_average_price": { "name": "Next 2 Hours Average Price" },
-      "next_3_hour_average_price": { "name": "Next 3 Hours Average Price" },
-      "next_4_hour_average_price": { "name": "Next 4 Hours Average Price" },
-      "next_6_hour_average_price": { "name": "Next 6 Hours Average Price" },
-      "next_8_hour_average_price": { "name": "Next 8 Hours Average Price" },
-      "next_12_hour_average_price": { "name": "Next 12 Hours Average Price" },
-      "next_24_hour_average_price": { "name": "Next 24 Hours Average Price" },
+      "daily_energy_advice": {"name": "Daily Energy Advice", "state": {"ready": "Advice available", "unavailable": "Insufficient data"}},
+      "best_consumption_window": {"name": "Best Consumption Window"},
+      "solar_forecast_today": {"name":"Solar Forecast Today"},
+      "solar_forecast_tomorrow": {"name":"Solar Forecast Tomorrow"},
+      "daily_forecast_quality": {"name":"Forecast Data Quality","state":{"partial":"Partially available","unavailable":"Unavailable"}},
+      "supplier_tariff_status": {
+        "name": "Supplier Tariff Status",
+        "state": {
+          "current": "Current",
+          "verification_recommended": "Verification recommended",
+          "stale": "Stale",
+          "unknown": "Unknown",
+          "custom": "Custom"
+        }
+      },
+      "supplier_registry_status": {
+        "name": "Supplier Registry Status",
+        "state": {
+          "remote": "Remote",
+          "cached_remote": "Cached remote",
+          "bundled": "Bundled"
+        }
+      },
+      "current_market_price": {
+        "name": "Current Market Price"
+      },
+      "current_sell_price": {
+        "name": "Current Sell Price"
+      },
+      "next_hour_market_price": {
+        "name": "Next Market Price"
+      },
+      "average_price_today": {
+        "name": "Average Price Today"
+      },
+      "average_price_tomorrow": {
+        "name": "Average Price Tomorrow"
+      },
+      "lowest_price_today": {
+        "name": "Lowest Price Today"
+      },
+      "lowest_energy_price": {
+        "name": "Lowest Energy Price Time"
+      },
+      "highest_price_today": {
+        "name": "Highest Price Today"
+      },
+      "highest_energy_price": {
+        "name": "Highest Energy Price Time"
+      },
+      "time_of_lowest_price_today": {
+        "name": "Time Of Lowest Price Today"
+      },
+      "time_of_highest_price_today": {
+        "name": "Time Of Highest Price Today"
+      },
+      "current_all_in_price": {
+        "name": "Current All-in Price"
+      },
+      "next_hour_all_in_price": {
+        "name": "Next All-in Price"
+      },
+      "average_all_in_price_today": {
+        "name": "Average All-in Price Today"
+      },
+      "lowest_all_in_price_today": {
+        "name": "Lowest All-in Price Today"
+      },
+      "highest_all_in_price_today": {
+        "name": "Highest All-in Price Today"
+      },
+      "supplier_purchase_fee": {
+        "name": "Supplier Purchase Fee"
+      },
+      "supplier_monthly_fee": {
+        "name": "Supplier Monthly Fee"
+      },
+      "selected_supplier": {
+        "name": "Selected Supplier"
+      },
+      "effective_price_resolution": {
+        "name": "Effective Price Resolution"
+      },
+      "current_provider": {
+        "name": "Current Provider"
+      },
+      "last_successful_update": {
+        "name": "Last Successful Update"
+      },
+      "next_1_hour_average_price": {
+        "name": "Next 1 Hour Average Price"
+      },
+      "next_2_hour_average_price": {
+        "name": "Next 2 Hours Average Price"
+      },
+      "next_3_hour_average_price": {
+        "name": "Next 3 Hours Average Price"
+      },
+      "next_4_hour_average_price": {
+        "name": "Next 4 Hours Average Price"
+      },
+      "next_6_hour_average_price": {
+        "name": "Next 6 Hours Average Price"
+      },
+      "next_8_hour_average_price": {
+        "name": "Next 8 Hours Average Price"
+      },
+      "next_12_hour_average_price": {
+        "name": "Next 12 Hours Average Price"
+      },
+      "next_24_hour_average_price": {
+        "name": "Next 24 Hours Average Price"
+      },
       "current_price_trend": {
         "name": "Current Price Trend",
         "state": {
@@ -216,7 +532,9 @@
           "strongly_rising": "Strongly rising"
         }
       },
-      "next_trend_change_time": { "name": "Next Trend Change Time" },
+      "next_trend_change_time": {
+        "name": "Next Trend Change Time"
+      },
       "price_trajectory": {
         "name": "Price Trajectory",
         "state": {
@@ -229,7 +547,11 @@
       },
       "price_rating": {
         "name": "Price Rating",
-        "state": { "low": "Low", "normal": "Normal", "high": "High" }
+        "state": {
+          "low": "Low",
+          "normal": "Normal",
+          "high": "High"
+        }
       },
       "price_level": {
         "name": "Price Level",
@@ -243,26 +565,61 @@
       },
       "volatility_today": {
         "name": "Volatility Today",
-        "state": { "low": "Low", "moderate": "Moderate", "high": "High", "very_high": "Very high" }
+        "state": {
+          "low": "Low",
+          "moderate": "Moderate",
+          "high": "High",
+          "very_high": "Very high"
+        }
       },
       "volatility_tomorrow": {
         "name": "Volatility Tomorrow",
-        "state": { "low": "Low", "moderate": "Moderate", "high": "High", "very_high": "Very high" }
+        "state": {
+          "low": "Low",
+          "moderate": "Moderate",
+          "high": "High",
+          "very_high": "Very high"
+        }
       },
       "volatility_next_24h": {
         "name": "Volatility Next 24h",
-        "state": { "low": "Low", "moderate": "Moderate", "high": "High", "very_high": "Very high" }
+        "state": {
+          "low": "Low",
+          "moderate": "Moderate",
+          "high": "High",
+          "very_high": "Very high"
+        }
       },
-      "best_price_period_start": { "name": "Best Price Period Start" },
-      "best_price_period_end": { "name": "Best Price Period End" },
-      "best_price_period_remaining_minutes": { "name": "Best Price Period Remaining Minutes" },
-      "best_price_period_progress_percent": { "name": "Best Price Period Progress Percent" },
-      "next_best_price_period_start": { "name": "Next Best Price Period Start" },
-      "peak_price_period_start": { "name": "Peak Price Period Start" },
-      "peak_price_period_end": { "name": "Peak Price Period End" },
-      "peak_price_period_remaining_minutes": { "name": "Peak Price Period Remaining Minutes" },
-      "peak_price_period_progress_percent": { "name": "Peak Price Period Progress Percent" },
-      "next_peak_price_period_start": { "name": "Next Peak Price Period Start" },
+      "best_price_period_start": {
+        "name": "Best Price Period Start"
+      },
+      "best_price_period_end": {
+        "name": "Best Price Period End"
+      },
+      "best_price_period_remaining_minutes": {
+        "name": "Best Price Period Remaining Minutes"
+      },
+      "best_price_period_progress_percent": {
+        "name": "Best Price Period Progress Percent"
+      },
+      "next_best_price_period_start": {
+        "name": "Next Best Price Period Start"
+      },
+      "peak_price_period_start": {
+        "name": "Peak Price Period Start"
+      },
+      "peak_price_period_end": {
+        "name": "Peak Price Period End"
+      },
+      "peak_price_period_remaining_minutes": {
+        "name": "Peak Price Period Remaining Minutes"
+      },
+      "peak_price_period_progress_percent": {
+        "name": "Peak Price Period Progress Percent"
+      },
+      "next_peak_price_period_start": {
+        "name": "Next Peak Price Period Start"
+      },
       "price_advisor": {
         "name": "Price Advisor",
         "state": {
@@ -273,7 +630,9 @@
           "critical": "Critical"
         }
       },
-      "price_score": { "name": "Price Score" },
+      "price_score": {
+        "name": "Price Score"
+      },
       "today_score": {
         "name": "Today Score",
         "state": {
@@ -304,8 +663,12 @@
           "very_expensive": "Very expensive"
         }
       },
-      "best_export_period": { "name": "Best Export Period" },
-      "worst_export_period": { "name": "Worst Export Period" },
+      "best_export_period": {
+        "name": "Best Export Period"
+      },
+      "worst_export_period": {
+        "name": "Worst Export Period"
+      },
       "energy_opportunity": {
         "name": "Energy Opportunity",
         "state": {
@@ -318,28 +681,64 @@
       }
     },
     "binary_sensor": {
-      "tomorrow_prices_available": { "name": "Tomorrow Prices Available" },
-      "api_data_available": { "name": "API/Data Available" },
-      "best_price_period": { "name": "Best Price Period" },
-      "peak_price_period": { "name": "Peak Price Period" },
-      "cheap_energy_now": { "name": "Cheap Energy Now" },
-      "expensive_energy_now": { "name": "Expensive Energy Now" },
-      "exceptional_opportunity_now": { "name": "Exceptional Opportunity Now" }
+      "tomorrow_prices_available": {
+        "name": "Tomorrow Prices Available"
+      },
+      "api_data_available": {
+        "name": "API/Data Available"
+      },
+      "best_price_period": {
+        "name": "Best Price Period"
+      },
+      "peak_price_period": {
+        "name": "Peak Price Period"
+      },
+      "cheap_energy_now": {
+        "name": "Cheap Energy Now"
+      },
+      "expensive_energy_now": {
+        "name": "Expensive Energy Now"
+      },
+      "exceptional_opportunity_now": {
+        "name": "Exceptional Opportunity Now"
+      }
     },
     "number": {
-      "best_period_duration_minutes": { "name": "Best Period Duration" },
-      "peak_period_duration_minutes": { "name": "Peak Period Duration" },
-      "best_period_flex_percent": { "name": "Best Period Flex" },
-      "peak_period_flex_percent": { "name": "Peak Period Flex" },
-      "minimum_gap_minutes": { "name": "Minimum Gap" },
-      "stable_threshold_percent": { "name": "Stable Trend Threshold" },
-      "strong_threshold_percent": { "name": "Strong Trend Threshold" }
+      "best_period_duration_minutes": {
+        "name": "Best Period Duration"
+      },
+      "peak_period_duration_minutes": {
+        "name": "Peak Period Duration"
+      },
+      "best_period_flex_percent": {
+        "name": "Best Period Flex"
+      },
+      "peak_period_flex_percent": {
+        "name": "Peak Period Flex"
+      },
+      "minimum_gap_minutes": {
+        "name": "Minimum Gap"
+      },
+      "stable_threshold_percent": {
+        "name": "Stable Trend Threshold"
+      },
+      "strong_threshold_percent": {
+        "name": "Strong Trend Threshold"
+      }
     },
     "switch": {
-      "allow_best_period_relaxation": { "name": "Enable Best Period Relaxation" },
-      "allow_peak_period_relaxation": { "name": "Enable Peak Period Relaxation" },
-      "enable_extended_attributes": { "name": "Enable Extended Attributes" },
-      "enable_chart_helper_entities": { "name": "Enable Chart Helper Entities" }
+      "allow_best_period_relaxation": {
+        "name": "Enable Best Period Relaxation"
+      },
+      "allow_peak_period_relaxation": {
+        "name": "Enable Peak Period Relaxation"
+      },
+      "enable_extended_attributes": {
+        "name": "Enable Extended Attributes"
+      },
+      "enable_chart_helper_entities": {
+        "name": "Enable Chart Helper Entities"
+      }
     }
   }
 }

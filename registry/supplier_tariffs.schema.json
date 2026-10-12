@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EnerPrice Remote Supplier Registry v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "revision",
+    "country",
+    "currency",
+    "suppliers"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "published_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "T.*(?:Z|\\+00:00)$"
+    },
+    "country": {
+      "const": "NL"
+    },
+    "currency": {
+      "const": "EUR"
+    },
+    "suppliers": {
+      "type": "object",
+      "maxProperties": 100,
+      "required": [
+        "zonneplan",
+        "tibber",
+        "anwb_energie",
+        "easy_energy",
+        "eneco",
+        "vandebron",
+        "vattenfall",
+        "greenchoice",
+        "energyzero",
+        "samsam",
+        "pure_energie"
+      ],
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]{0,63}$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "tariffs"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "tariffs": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "valid_from",
+                "valid_until",
+                "purchase_fee_import",
+                "purchase_fee_export",
+                "fixed_monthly_fee_electricity",
+                "vat_included",
+                "export_vat_included",
+                "settlement_resolution",
+                "source_type",
+                "source_url",
+                "last_verified",
+                "notes",
+                "feed_in_fee",
+                "imbalance_fee",
+                "profile_version",
+                "supports_hourly_prices",
+                "supports_quarter_hour_prices"
+              ],
+              "properties": {
+                "valid_from": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "valid_until": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "purchase_fee_import": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 5
+                },
+                "purchase_fee_export": {
+                  "type": "number",
+                  "minimum": -5,
+                  "maximum": 5
+                },
+                "fixed_monthly_fee_electricity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "vat_included": {
+                  "type": "boolean"
+                },
+                "export_vat_included": {
+                  "type": "boolean"
+                },
+                "settlement_resolution": {
+                  "enum": [
+                    "hourly",
+                    "quarter_hour"
+                  ]
+                },
+                "source_type": {
+                  "enum": [
+                    "official",
+                    "secondary",
+                    "manual",
+                    "unknown"
+                  ]
+                },
+                "source_url": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uri",
+                  "maxLength": 2048,
+                  "pattern": "^https?://[^\\s]+$"
+                },
+                "last_verified": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "notes": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "maxLength": 10000
+                },
+                "feed_in_fee": {
+                  "type": "number",
+                  "minimum": -5,
+                  "maximum": 5
+                },
+                "imbalance_fee": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": -5,
+                  "maximum": 5
+                },
+                "profile_version": {
+                  "type": "integer",
+                  "const": 2
+                },
+                "supports_hourly_prices": {
+                  "type": "boolean"
+                },
+                "supports_quarter_hour_prices": {
+                  "type": "boolean"
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "source_type": {
+                        "enum": [
+                          "official",
+                          "secondary"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "source_url": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

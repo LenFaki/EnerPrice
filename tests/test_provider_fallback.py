@@ -101,15 +101,3 @@ async def test_entsoe_tolerates_unpublished_tomorrow(monkeypatch: pytest.MonkeyP
     assert result.prices_tomorrow == []
     assert result.raw_tomorrow is None
 
-
-@pytest.mark.asyncio
-async def test_fetch_optional_day_returns_none_on_provider_error() -> None:
-    """The shared tolerance helper swallows ProviderError for a single day
-    without raising, so any provider can opt in by using it for tomorrow."""
-    provider = NordPoolProvider(session=None, country="NL", currency="EUR")
-
-    async def failing(day: date) -> dict:
-        raise ProviderError("not published yet")
-
-    assert await provider._fetch_optional_day(date(2026, 7, 3), failing) is None
-

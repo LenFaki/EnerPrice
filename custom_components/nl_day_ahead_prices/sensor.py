@@ -10,9 +10,10 @@ from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorEntityDescription, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfEnergy
+from homeassistant.const import EntityCategory, UnitOfEnergy
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
@@ -23,15 +24,15 @@ from .analysis.rating import price_ratings
 from .analysis.trend import trend_for_prices
 from .analysis.volatility import volatility
 from .calculations import (
-    build_all_in_price_attributes,
+    all_in_entries_for_supplier,
     build_sell_price_attributes,
-    calculate_all_in_price,
     calculate_monthly_fee,
     calculate_sell_price,
     calculate_supplier_export_fee,
     calculate_supplier_fee,
 )
 from .const import (
+    CONF_ADVICE_LANGUAGE,
     CONF_ALLOW_BEST_RELAXATION,
     CONF_ALLOW_PEAK_RELAXATION,
     CONF_BEST_PERIOD_DURATION,
@@ -43,24 +44,38 @@ from .const import (
     CONF_CUSTOM_SELL_FEE_ELECTRICITY,
     CONF_CUSTOM_SELL_FEE_INCLUDES_VAT,
     CONF_CUSTOM_SUPPLIER_NAME,
+    CONF_ELECTRIC_EFFICIENCY,
     CONF_ENERGY_TAX,
     CONF_ENERGY_TAX_INCL_VAT,
     CONF_EXTENDED_ATTRIBUTES,
+    CONF_FLEXIBLE_LOAD_POWER_W,
+    CONF_GAS_EFFICIENCY,
+    CONF_GAS_KWH_PER_M3,
+    CONF_GAS_PRICE_ENTITY,
+    CONF_GRID_POWER_ENTITY,
     CONF_MINIMUM_GAP,
     CONF_PEAK_PERIOD_DURATION,
     CONF_PEAK_PERIOD_FLEX,
     CONF_SELECTED_SUPPLIER,
+    CONF_SMART_SETUP_ENABLED,
+    CONF_SOLAR_POWER_ENTITY,
+    CONF_SOLAR_SURPLUS_THRESHOLD_W,
     CONF_STABLE_TREND_THRESHOLD,
     CONF_STRONG_TREND_THRESHOLD,
     CONF_SUPPLIER_MARKUP_EXCL_VAT,
     CONF_VAT,
+    DEFAULT_ADVICE_LANGUAGE,
     DEFAULT_CUSTOM_MONTHLY_FEE_ELECTRICITY,
     DEFAULT_CUSTOM_PURCHASE_FEE_INCLUDES_VAT,
     DEFAULT_CUSTOM_SELL_FEE_ELECTRICITY,
     DEFAULT_CUSTOM_SELL_FEE_INCLUDES_VAT,
     DEFAULT_CUSTOM_SUPPLIER_NAME,
+    DEFAULT_ELECTRIC_EFFICIENCY,
     DEFAULT_ENERGY_TAX,
+    DEFAULT_GAS_EFFICIENCY,
+    DEFAULT_GAS_KWH_PER_M3,
     DEFAULT_SELECTED_SUPPLIER,
+    DEFAULT_SOLAR_SURPLUS_THRESHOLD_W,
     DEFAULT_SUPPLIER_MARKUP_EXCL_VAT,
     DEFAULT_VAT,
     DOMAIN,
@@ -80,8 +95,11 @@ from .price_resolution import (
     PRICE_RESOLUTION_QUARTER_HOUR,
     find_cheapest_consecutive_block,
 )
+from .registry_status import registry_status, tariff_status
 from .scoring import calculate_day_score, calculate_opportunity, calculate_price_score
-from .supplier_profiles import SupplierProfile, load_supplier_profiles, supplier_profile_to_dict
+from .smart_energy import build_smart_energy_advice
+from .supplier_profiles import SupplierProfile, supplier_profile_to_dict
+from .supplier_registry import get_supplier_tariff, supplier_update_mode, tariff_metadata
 
 EUR_PER_KWH = f"EUR/{UnitOfEnergy.KILO_WATT_HOUR}"
 _LOGGER = logging.getLogger(__name__)
@@ -111,23 +129,21 @@ def _next_hour(data: PriceData, now: datetime, entry: ConfigEntry) -> float | No
 
 
 def _average_today(data: PriceData, now: datetime, entry: ConfigEntry) -> float | None:
-    market = average_price(data.result.prices_today)
-    return _calculate_all_in(market, entry) if market is not None else None
+    return average_price(_all_in_entries(data, entry, data.result.prices_today))
 
 
 def _average_tomorrow(data: PriceData, now: datetime, entry: ConfigEntry) -> float | None:
-    market = average_price(data.result.prices_tomorrow)
-    return _calculate_all_in(market, entry) if market is not None else None
+    return average_price(_all_in_entries(data, entry, data.result.prices_tomorrow))
 
 
 def _lowest_today(data: PriceData, now: datetime, entry: ConfigEntry) -> float | None:
-    entry_data = lowest_price(data.result.prices_today)
-    return _calculate_all_in(entry_data.price, entry) if entry_data else None
+    entry_data = lowest_price(_all_in_entries(data, entry, data.result.prices_today))
+    return entry_data.price if entry_data else None
 
 
 def _highest_today(data: PriceData, now: datetime, entry: ConfigEntry) -> float | None:
-    entry_data = highest_price(data.result.prices_today)
-    return _calculate_all_in(entry_data.price, entry) if entry_data else None
+    entry_data = highest_price(_all_in_entries(data, entry, data.result.prices_today))
+    return entry_data.price if entry_data else None
 
 
 def _lowest_time_today(data: PriceData, now: datetime, entry: ConfigEntry) -> datetime | None:
@@ -141,17 +157,11 @@ def _highest_time_today(data: PriceData, now: datetime, entry: ConfigEntry) -> d
 
 
 def _current_all_in(data: PriceData, now: datetime, entry: ConfigEntry) -> float | None:
-    market = current_price(data.result.prices, now)
-    if market is None:
-        return None
-    return _calculate_all_in(market, entry)
+    return current_price(_all_in_entries(data, entry), now)
 
 
 def _next_hour_all_in(data: PriceData, now: datetime, entry: ConfigEntry) -> float | None:
-    market = next_hour_price(data.result.prices, now)
-    if market is None:
-        return None
-    return _calculate_all_in(market, entry)
+    return next_hour_price(_all_in_entries(data, entry), now)
 
 
 def _average_all_in_today(data: PriceData, now: datetime, entry: ConfigEntry) -> float | None:
@@ -182,15 +192,6 @@ def _effective_price_resolution(data: PriceData, now: datetime, entry: ConfigEnt
     return data.result.effective_price_resolution
 
 
-def _calculate_all_in(market: float, entry: ConfigEntry) -> float:
-    return calculate_all_in_price(
-        market,
-        _energy_tax(entry),
-        _selected_supplier_profile(entry),
-        _vat(entry),
-    )
-
-
 def _entry_options(entry: ConfigEntry) -> dict[str, Any]:
     return {**entry.data, **entry.options}
 
@@ -213,9 +214,9 @@ def _selected_supplier_profile(entry: ConfigEntry) -> SupplierProfile:
     if key == "custom":
         return _custom_supplier_profile(entry)
 
-    profiles = load_supplier_profiles()
-    if key in profiles:
-        return profiles[key]
+    profile = get_supplier_tariff(key, dt_util.now(), mode=supplier_update_mode(_entry_options(entry)))
+    if profile is not None:
+        return profile
 
     _LOGGER.warning("Configured supplier profile %s is unavailable; falling back to custom supplier", key)
     return _custom_supplier_profile(entry)
@@ -259,37 +260,86 @@ def _last_successful(data: PriceData, now: datetime, entry: ConfigEntry) -> date
     return data.last_successful_update
 
 
-def _all_in_entries(data: PriceData, entry: ConfigEntry) -> list:
-    return [
-        type(item)(item.time, _calculate_all_in(item.price, entry))
-        for item in data.result.prices
-    ]
+def _all_in_entries(data: PriceData, entry: ConfigEntry, prices: list | None = None) -> list:
+    return all_in_entries_for_supplier(
+        data.result.prices if prices is None else prices,
+        _energy_tax(entry), _selected_supplier_profile(entry), _vat(entry),
+    )
 
 
-def _analysis_value(key: str, data: PriceData, now: datetime, entry: ConfigEntry, runtime: dict[str, Any]) -> Any:
-    prices = _all_in_entries(data, entry)
+def _cached_all_in_entries(
+    coordinator: NLDayAheadPricesCoordinator,
+    data: PriceData,
+    entry: ConfigEntry,
+) -> list:
+    """Return all-in prices cached for the current coordinator cycle."""
+    cached_analysis = getattr(coordinator, "cached_analysis", None)
+    if cached_analysis is None:
+        return _all_in_entries(data, entry)
+    return cached_analysis("all_in_entries", lambda: _all_in_entries(data, entry))
+
+
+def _cached_value(coordinator: NLDayAheadPricesCoordinator | None, key: str, factory):
+    """Use the coordinator cache when available, with a direct-call fallback."""
+    cached_analysis = getattr(coordinator, "cached_analysis", None)
+    return cached_analysis(key, factory) if cached_analysis is not None else factory()
+
+
+def _cached_trend(
+    coordinator: NLDayAheadPricesCoordinator | None,
+    prices: list,
+    now: datetime,
+    runtime: dict[str, Any],
+) -> dict[str, Any]:
+    """Return trend analysis shared by sensors in the current interval."""
+    def factory():
+        return trend_for_prices(
+            prices,
+            now,
+            float(runtime[CONF_STABLE_TREND_THRESHOLD]),
+            float(runtime[CONF_STRONG_TREND_THRESHOLD]),
+        )
+    return _cached_value(coordinator, "trend", factory)
+
+
+def _cached_ratings(
+    coordinator: NLDayAheadPricesCoordinator | None,
+    prices: list,
+    now: datetime,
+) -> tuple[str, str]:
+    """Return price ratings shared by sensors in the current interval."""
+    def factory():
+        return price_ratings(current_price(prices, now), prices)
+    return _cached_value(coordinator, "ratings", factory)
+
+
+def _analysis_value(
+    key: str,
+    data: PriceData,
+    now: datetime,
+    entry: ConfigEntry,
+    runtime: dict[str, Any],
+    coordinator: NLDayAheadPricesCoordinator | None = None,
+) -> Any:
+    prices = (
+        _cached_all_in_entries(coordinator, data, entry)
+        if coordinator is not None
+        else _all_in_entries(data, entry)
+    )
     if key.startswith("v2:"):
         return _v2_data(key.removeprefix("v2:"), data, now, entry)["state"]
     if key.startswith("forecast_"):
         return average_next_period(prices, now, int(key.removeprefix("forecast_")))
-    trend = trend_for_prices(
-        prices,
-        now,
-        float(runtime[CONF_STABLE_TREND_THRESHOLD]),
-        float(runtime[CONF_STRONG_TREND_THRESHOLD]),
-    )
-    if key == "trend":
-        return trend["trend"]
-    if key == "trend_change":
-        return trend["next_change_time"]
-    if key == "trajectory":
+    if key in {"trend", "trend_change", "trajectory"}:
+        trend = _cached_trend(coordinator, prices, now, runtime)
+        if key == "trend":
+            return trend["trend"]
+        if key == "trend_change":
+            return trend["next_change_time"]
         return trend["trajectory"]
-    current = current_price(prices, now)
-    ratings = price_ratings(current, prices)
-    if key == "rating_3":
-        return ratings[0]
-    if key == "rating_5":
-        return ratings[1]
+    if key in {"rating_3", "rating_5"}:
+        ratings = _cached_ratings(coordinator, prices, now)
+        return ratings[0] if key == "rating_3" else ratings[1]
     if key.startswith("volatility_"):
         if key == "volatility_today":
             selected = [item for item in prices if item in prices[: len(data.result.prices_today)]]
@@ -323,9 +373,10 @@ def _v2_data(
     now: datetime,
     entry: ConfigEntry,
     language: str = "en",
+    all_in: list | None = None,
 ) -> dict[str, Any]:
     """Return state and attributes for an EnerPrice v2 sensor."""
-    all_in = _all_in_entries(data, entry)
+    all_in = _all_in_entries(data, entry) if all_in is None else all_in
     market_current = current_price(data.result.prices, now)
     all_in_current = current_price(all_in, now)
     score = calculate_price_score(all_in_current, all_in)
@@ -343,6 +394,8 @@ def _v2_data(
             trend=trend["trend"],
             volatility=stats["level"],
             language=language,
+            prices=all_in,
+            now=now,
         )
         return {"state": advice["state"], **advice}
     if key in {"today_score", "tomorrow_score"}:
@@ -397,12 +450,12 @@ def _sell_entries(data: PriceData, entry: ConfigEntry) -> list:
     return [type(item)(item.time, calculate_sell_price(item.price, profile, vat)) for item in data.result.prices]
 
 
-def _periods(data: PriceData, entry: ConfigEntry, runtime: dict[str, Any], *, peak: bool):
+def _periods(data: PriceData, entry: ConfigEntry, runtime: dict[str, Any], *, peak: bool, prices: list | None = None):
     duration_key = CONF_PEAK_PERIOD_DURATION if peak else CONF_BEST_PERIOD_DURATION
     flex_key = CONF_PEAK_PERIOD_FLEX if peak else CONF_BEST_PERIOD_FLEX
     relaxation_key = CONF_ALLOW_PEAK_RELAXATION if peak else CONF_ALLOW_BEST_RELAXATION
     return find_price_periods(
-        _all_in_entries(data, entry),
+        _all_in_entries(data, entry) if prices is None else prices,
         int(runtime[duration_key]),
         peak=peak,
         flex_percent=float(runtime[flex_key]),
@@ -681,8 +734,113 @@ async def async_setup_entry(
     """Set up sensors."""
     coordinator: NLDayAheadPricesCoordinator = hass.data[DOMAIN][entry.entry_id]
     entities = [NLDayAheadPriceSensor(coordinator, entry, description) for description in SENSORS]
+    entities.extend(NLRegistryDiagnosticSensor(coordinator, entry, description) for description in REGISTRY_SENSORS)
+    if _entry_options(entry).get(CONF_SMART_SETUP_ENABLED, False):
+        entities.append(NLSmartEnergyAdvisorSensor(coordinator, entry))
+    daily = getattr(coordinator, "daily_forecast", None)
+    if daily is not None:
+        from .daily_sensor import daily_advice_entities, daily_forecast_entities
+
+        entities.extend(daily_forecast_entities(daily, entry))
+        entities.extend(daily_advice_entities(coordinator, entry))
     _LOGGER.info("Adding %s EnerPrice sensor entities", len(entities))
     async_add_entities(entities)
+
+
+class NLSmartEnergyAdvisorSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], SensorEntity):
+    """Live Smart Energy Advisor using price and configured Home Assistant inputs."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Smart Energy Advisor"
+    _attr_icon = "mdi:home-lightning-bolt"
+    _unrecorded_attributes = frozenset({"daily_advisor"})
+
+    def __init__(self, coordinator: NLDayAheadPricesCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(coordinator)
+        self.entry = entry
+        self._attr_unique_id = f"{entry.entry_id}_smart_energy_advisor"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, entry.entry_id)},
+            "name": "EnerPrice",
+            "manufacturer": "EnerPrice",
+        }
+        self._result: dict[str, Any] = {}
+
+    @property
+    def suggested_object_id(self) -> str:
+        return "nl_day_ahead_smart_energy_advisor"
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        options = _entry_options(self.entry)
+        watched = [
+            options.get(CONF_GRID_POWER_ENTITY),
+            options.get(CONF_SOLAR_POWER_ENTITY),
+            options.get(CONF_GAS_PRICE_ENTITY),
+        ]
+        entity_ids = [entity_id for entity_id in watched if entity_id]
+        if entity_ids:
+            self.async_on_remove(async_track_state_change_event(self.hass, entity_ids, self._async_input_changed))
+        daily = getattr(self.coordinator, "daily_forecast", None)
+        if daily is not None:
+            self.async_on_remove(daily.async_add_listener(self.async_write_ha_state))
+
+    def _async_input_changed(self, event: Any) -> None:
+        """Refresh advice on the Home Assistant event loop."""
+        self.hass.loop.call_soon_threadsafe(self.async_write_ha_state)
+
+    def _advice(self) -> dict[str, Any]:
+        data = self.coordinator.data
+        if data is None:
+            return {"state": "normal", "recommendation": "Price data is not available."}
+        options = _entry_options(self.entry)
+        all_in = _cached_all_in_entries(self.coordinator, data, self.entry)
+        now = dt_util.now()
+        language = str(options.get(CONF_ADVICE_LANGUAGE, DEFAULT_ADVICE_LANGUAGE))
+        if language == "auto":
+            language = self.hass.config.language
+        context = None
+        if getattr(self.coordinator, "daily_forecast", None) is not None:
+            from .daily_advisor import advisor_context
+
+            context = advisor_context(self.coordinator)
+        return build_smart_energy_advice(
+            electricity_price=current_price(all_in, now),
+            future_prices=all_in,
+            now=now,
+            gas_price_per_m3=_state_float_sensor(self.hass, options.get(CONF_GAS_PRICE_ENTITY)),
+            solar_power_w=_state_float_sensor(self.hass, options.get(CONF_SOLAR_POWER_ENTITY)),
+            grid_power_w=_state_float_sensor(self.hass, options.get(CONF_GRID_POWER_ENTITY)),
+            flexible_load_power_w=options.get(CONF_FLEXIBLE_LOAD_POWER_W),
+            electric_efficiency=float(options.get(CONF_ELECTRIC_EFFICIENCY, DEFAULT_ELECTRIC_EFFICIENCY)),
+            gas_efficiency=float(options.get(CONF_GAS_EFFICIENCY, DEFAULT_GAS_EFFICIENCY)),
+            gas_kwh_per_m3=float(options.get(CONF_GAS_KWH_PER_M3, DEFAULT_GAS_KWH_PER_M3)),
+            solar_surplus_threshold_w=float(options.get(CONF_SOLAR_SURPLUS_THRESHOLD_W, DEFAULT_SOLAR_SURPLUS_THRESHOLD_W)),
+            language=language,
+            daily_context=context,
+        )
+
+    @property
+    def native_value(self) -> str:
+        self._result = self._advice()
+        return str(self._result["state"])
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        self._result = self._advice()
+        return {key: (value.isoformat() if isinstance(value, datetime) else value) for key, value in self._result.items() if key != "state"}
+
+
+def _state_float_sensor(hass: HomeAssistant, entity_id: str | None) -> float | None:
+    if not entity_id:
+        return None
+    state = hass.states.get(entity_id)
+    if state is None or state.state in {"unknown", "unavailable", "none", ""}:
+        return None
+    try:
+        return float(state.state)
+    except (TypeError, ValueError):
+        return None
 
 
 class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], SensorEntity):
@@ -690,39 +848,20 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
 
     entity_description: NLPriceSensorDescription
     _attr_has_entity_name = True
-
-    # These attributes hold full price series / raw provider payloads that are
-    # rebuilt on every coordinator refresh. They routinely push the serialized
-    # attribute dict past the recorder's 16 KiB limit, which makes the recorder
-    # drop *all* attributes for the state. Keeping them out of the recorder lets
-    # the scalar attributes (trend, ratings, day stats, ...) keep their history
-    # while the arrays stay available live for templates and chart cards.
-    _unrecorded_attributes = frozenset(
-        {
-            "prices",
-            "prices_today",
-            "prices_tomorrow",
-            "raw_prices",
-            "raw_prices_today",
-            "raw_prices_tomorrow",
-            "all_in_prices_today",
-            "all_in_prices_tomorrow",
-            "sell_prices_today",
-            "sell_prices_tomorrow",
-            "raw_today",
-            "raw_tomorrow",
-            "supplier_profile",
-            "best_periods",
-            "peak_periods",
-            "cheapest_15_minutes",
-            "cheapest_30_minutes",
-            "cheapest_45_minutes",
-            "cheapest_1_hour",
-            "cheapest_2_hours",
-            "cheapest_3_hours",
-            "cheapest_4_hours",
-        }
-    )
+    # Keep chart arrays available to dashboards/ApexCharts while preventing the
+    # recorder from storing the same large payload on every price sensor. These
+    # routinely push the serialized attributes past the recorder's 16 KiB limit,
+    # which makes it drop *all* attributes for the state.
+    _unrecorded_attributes = frozenset({
+        "prices", "prices_today", "prices_tomorrow",
+        "all_in_prices", "all_in_prices_today", "all_in_prices_tomorrow",
+        "sell_prices_today", "sell_prices_tomorrow",
+        "raw_prices", "raw_prices_today", "raw_prices_tomorrow",
+        "raw_today", "raw_tomorrow", "supplier_profile",
+        "best_periods", "peak_periods",
+        "cheapest_15_minutes", "cheapest_30_minutes", "cheapest_45_minutes",
+        "cheapest_1_hour", "cheapest_2_hours", "cheapest_3_hours", "cheapest_4_hours",
+    })
 
     def __init__(
         self,
@@ -764,6 +903,7 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
                         dt_util.now(),
                         self.entry,
                         language,
+                        _cached_all_in_entries(self.coordinator, self.coordinator.data, self.entry),
                     ),
                 )
                 value = result["state"]
@@ -774,6 +914,7 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
                     dt_util.now(),
                     self.entry,
                     self.coordinator.runtime_options,
+                    self.coordinator,
                 )
         else:
             value = self.entity_description.value_fn(self.coordinator.data, dt_util.now(), self.entry)
@@ -786,50 +927,32 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
         if data is None:
             return {}
         supplier_profile = _selected_supplier_profile(self.entry)
-        cheapest_blocks = _cheapest_block_attributes(data)
-        now = dt_util.now()
-        prices = data.result.prices
-        current_index = next(
-            (index for index, item in enumerate(prices) if item.time <= now and (index + 1 == len(prices) or now < prices[index + 1].time)),
-            None,
+        all_in_entries = _cached_all_in_entries(self.coordinator, data, self.entry)
+        today_count = len(data.result.prices_today)
+        shared_price_attributes = _cached_value(
+            self.coordinator,
+            "shared_price_attributes",
+            lambda: {
+                "prices": [entry.as_attribute() for entry in data.result.prices],
+                "all_in_prices": [entry.as_attribute() for entry in all_in_entries],
+                "prices_today": [entry.as_attribute() for entry in data.result.prices_today],
+                "prices_tomorrow": [entry.as_attribute() for entry in data.result.prices_tomorrow],
+                "raw_prices": [entry.as_attribute() for entry in data.result.raw_prices],
+                "raw_prices_today": [entry.as_attribute() for entry in data.result.source_prices_today],
+                "raw_prices_tomorrow": [entry.as_attribute() for entry in data.result.source_prices_tomorrow],
+            },
         )
-        current_entry = prices[current_index] if current_index is not None else None
-        next_entry = prices[current_index + 1] if current_index is not None and current_index + 1 < len(prices) else None
-        all_in_entries = _all_in_entries(data, self.entry)
-        current_all_in = current_price(all_in_entries, now)
-        rating_3, rating_5 = price_ratings(current_all_in, all_in_entries)
-        trend = trend_for_prices(
-            all_in_entries,
-            now,
-            float(self.coordinator.runtime_options[CONF_STABLE_TREND_THRESHOLD]),
-            float(self.coordinator.runtime_options[CONF_STRONG_TREND_THRESHOLD]),
-        )
-        day_stats = volatility(
-            all_in_entries[: len(data.result.prices_today)]
-        )
-        best_periods = _periods(data, self.entry, self.coordinator.runtime_options, peak=False)
-        peak_periods = _periods(data, self.entry, self.coordinator.runtime_options, peak=True)
+        all_in_attributes = shared_price_attributes["all_in_prices"]
         base = {
-            "prices": [entry.as_attribute() for entry in data.result.prices],
-            "prices_today": [entry.as_attribute() for entry in data.result.prices_today],
-            "prices_tomorrow": [entry.as_attribute() for entry in data.result.prices_tomorrow],
-            "raw_prices": [entry.as_attribute() for entry in data.result.raw_prices],
-            "raw_prices_today": [entry.as_attribute() for entry in data.result.source_prices_today],
-            "raw_prices_tomorrow": [entry.as_attribute() for entry in data.result.source_prices_tomorrow],
-            "all_in_prices_today": build_all_in_price_attributes(
-                data.result.prices_today, _energy_tax(self.entry), supplier_profile, _vat(self.entry)
-            ),
-            "all_in_prices_tomorrow": build_all_in_price_attributes(
-                data.result.prices_tomorrow, _energy_tax(self.entry), supplier_profile, _vat(self.entry)
-            ),
+            **shared_price_attributes,
+            "all_in_prices_today": all_in_attributes[:today_count],
+            "all_in_prices_tomorrow": all_in_attributes[today_count:],
             "sell_prices_today": build_sell_price_attributes(
                 data.result.prices_today, supplier_profile, _vat(self.entry)
             ),
             "sell_prices_tomorrow": build_sell_price_attributes(
                 data.result.prices_tomorrow, supplier_profile, _vat(self.entry)
             ),
-            "raw_today": data.result.raw_today,
-            "raw_tomorrow": data.result.raw_tomorrow,
             "price_resolution": data.result.effective_price_resolution,
             "requested_price_resolution": data.result.requested_price_resolution,
             "effective_price_resolution": data.result.effective_price_resolution,
@@ -846,14 +969,36 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
             else None,
             "selected_supplier": supplier_profile.key,
             "selected_supplier_name": supplier_profile.name,
+            **tariff_metadata(supplier_profile, dt_util.now()),
             "supplier_purchase_fee": round(calculate_supplier_fee(supplier_profile, _vat(self.entry)), 6),
             "supplier_monthly_fee": round(calculate_monthly_fee(supplier_profile), 2),
             "energy_tax": _energy_tax(self.entry),
             "vat": _vat(self.entry),
+        }
+        if not self.coordinator.runtime_options[CONF_EXTENDED_ATTRIBUTES]:
+            return base
+
+        now = dt_util.now()
+        prices = data.result.prices
+        current_index = next(
+            (index for index, item in enumerate(prices) if item.time <= now and (index + 1 == len(prices) or now < prices[index + 1].time)),
+            None,
+        )
+        current_entry = prices[current_index] if current_index is not None else None
+        next_entry = prices[current_index + 1] if current_index is not None and current_index + 1 < len(prices) else None
+        current_all_in = current_price(all_in_entries, now)
+        rating_3, rating_5 = _cached_ratings(self.coordinator, all_in_entries, now)
+        trend = _cached_trend(self.coordinator, all_in_entries, now, self.coordinator.runtime_options)
+        day_stats = _cached_value(
+            self.coordinator, "volatility_today", lambda: volatility(all_in_entries[:today_count])
+        )
+        base.update({
+            "raw_today": data.result.raw_today,
+            "raw_tomorrow": data.result.raw_tomorrow,
             "supplier_profile_last_verified": supplier_profile.last_verified,
             "supplier_profile_source_url": supplier_profile.source_url,
             "supplier_profile": supplier_profile_to_dict(supplier_profile),
-            **cheapest_blocks,
+            **_cheapest_block_attributes(data),
             "current_interval_start": current_entry.time.isoformat() if current_entry else None,
             "current_interval_end": next_entry.time.isoformat() if next_entry else None,
             "next_interval_start": next_entry.time.isoformat() if next_entry else None,
@@ -876,21 +1021,20 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
             "day_max": day_stats.get("max_price"),
             "day_average": day_stats.get("average_price"),
             "day_median": day_stats.get("median_price"),
-        }
+        })
         if self.coordinator.runtime_options[CONF_CHART_HELPERS]:
+            best_periods = _cached_value(
+                self.coordinator,
+                "best_periods",
+                lambda: _periods(data, self.entry, self.coordinator.runtime_options, peak=False, prices=all_in_entries),
+            )
+            peak_periods = _cached_value(
+                self.coordinator,
+                "peak_periods",
+                lambda: _periods(data, self.entry, self.coordinator.runtime_options, peak=True, prices=all_in_entries),
+            )
             base["best_periods"] = [period.as_dict() for period in best_periods]
             base["peak_periods"] = [period.as_dict() for period in peak_periods]
-        if not self.coordinator.runtime_options[CONF_EXTENDED_ATTRIBUTES]:
-            return {
-                key: base[key]
-                for key in (
-                    "provider",
-                    "fallback_used",
-                    "last_successful_update",
-                    "price_resolution",
-                    "selected_supplier",
-                )
-            }
         if self.entity_description.analysis_key and self.entity_description.analysis_key.startswith("volatility_"):
             if self.entity_description.analysis_key == "volatility_today":
                 base.update(volatility(all_in_entries[: len(data.result.prices_today)]))
@@ -904,7 +1048,7 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
             v2_attributes = dict(
                 self.coordinator.cached_analysis(
                     f"v2:{language}:{key}",
-                    lambda: _v2_data(key, data, now, self.entry, language),
+                    lambda: _v2_data(key, data, now, self.entry, language, all_in_entries),
                 )
             )
             v2_attributes.pop("state", None)
@@ -932,3 +1076,40 @@ def _cheapest_block_attributes(data: PriceData) -> dict[str, Any]:
             "cheapest_4_hours": 240,
         }
     return {key: find_cheapest_consecutive_block(prices, minutes) for key, minutes in durations.items()}
+
+REGISTRY_SENSORS = (
+    NLPriceSensorDescription(
+        key="supplier_tariff_status", translation_key="supplier_tariff_status",
+        device_class=SensorDeviceClass.ENUM, entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=True,
+        options=["current", "verification_recommended", "stale", "unknown", "custom"],
+        value_fn=lambda data, now, entry: None,
+    ),
+    NLPriceSensorDescription(
+        key="supplier_registry_status", translation_key="supplier_registry_status",
+        device_class=SensorDeviceClass.ENUM, entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=True,
+        options=["remote", "cached_remote", "bundled"],
+        value_fn=lambda data, now, entry: None,
+    ),
+)
+
+
+class NLRegistryDiagnosticSensor(NLDayAheadPriceSensor):
+    """Registry diagnostics stay available even when market APIs are unavailable."""
+
+    @property
+    def available(self):
+        return True
+
+    @property
+    def native_value(self):
+        attrs = self.extra_state_attributes
+        return attrs["freshness"] if self.entity_description.key == "supplier_tariff_status" else attrs["active_source"]
+
+    @property
+    def extra_state_attributes(self):
+        manager = getattr(self.coordinator, "registry_manager", None)
+        if self.entity_description.key == "supplier_tariff_status":
+            return tariff_status(_selected_supplier_profile(self.entry), dt_util.now(), manager)
+        return registry_status(manager, supplier_update_mode(_entry_options(self.entry)))

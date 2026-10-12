@@ -1,3 +1,6 @@
+get_daily_forecast:
+  fields: {}
+
 export_chart_data:
   fields:
     include_today:
@@ -138,7 +141,12 @@ find_best_appliance_window:
       default: true
       selector: {boolean: {}}
 generate_dashboard_yaml:
+  name: Generate Smart Energy dashboard YAML
+  description: Generate an adaptive EnerPrice dashboard using the selected config entry and optional Smart Setup entities.
   fields:
+    config_entry_id:
+      description: Optional EnerPrice config entry ID. Required when multiple EnerPrice entries are loaded.
+      selector: {text: {}}
     dashboard_type:
       default: full
       selector: {select: {options: [compact, full, energy_advisor]}}
@@ -163,6 +171,18 @@ generate_dashboard_yaml:
     include_battery_strategy:
       default: false
       selector: {boolean: {}}
+    include_smart_energy:
+      default: true
+      selector: {boolean: {}}
+    include_daily_advisor:
+      default: false
+      selector: {boolean: {}}
+    use_apexcharts:
+      default: true
+      selector: {boolean: {}}
+    language:
+      default: auto
+      selector: {select: {options: [auto, en, nl]}}
     theme:
       default: auto
       selector: {select: {options: [auto, light, dark]}}
@@ -192,3 +212,110 @@ generate_automation_yaml:
     deadline:
       example: "07:00:00"
       selector: {text: {}}
+
+
+get_smart_energy_advice:
+  name: Get smart energy advice
+  description: Compare solar surplus, grid electricity, gas heat and a cheaper upcoming electricity interval without controlling devices.
+  fields:
+    config_entry_id:
+      name: EnerPrice config entry ID
+      description: Optional config entry ID. Required when more than one EnerPrice configuration is loaded.
+      selector:
+        text: {}
+    gas_price_entity:
+      name: Gas price entity
+      description: Optional Home Assistant entity containing the current gas price in EUR/m³.
+      selector:
+        entity: {}
+    solar_power_entity:
+      name: Solar power entity
+      description: Optional current solar production entity in watts.
+      selector:
+        entity: {}
+    grid_power_entity:
+      name: Grid power entity
+      description: Optional grid power entity in watts; positive is import and negative is export.
+      selector:
+        entity: {}
+    gas_price_per_m3:
+      name: Gas price
+      description: Optional direct gas price in EUR/m³; overrides the gas price entity.
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 0.001
+          mode: box
+    solar_power_w:
+      name: Solar power
+      description: Optional direct solar production in watts; overrides the solar entity.
+      selector:
+        number:
+          mode: box
+    grid_power_w:
+      name: Grid power
+      description: Optional direct grid power in watts; overrides the grid entity.
+      selector:
+        number:
+          mode: box
+    electric_efficiency:
+      name: Electric heating efficiency
+      description: Useful heat divided by electric input; resistance heating is normally close to 1.0.
+      default: 1.0
+      selector:
+        number:
+          min: 0.01
+          max: 10
+          step: 0.01
+          mode: box
+    gas_efficiency:
+      name: Gas heating efficiency
+      description: Estimated useful heat efficiency of the gas appliance for domestic hot water.
+      default: 0.90
+      selector:
+        number:
+          min: 0.01
+          max: 1
+          step: 0.01
+          mode: box
+    gas_kwh_per_m3:
+      name: Gas energy content
+      description: Assumed energy content of one cubic metre of gas in kWh.
+      default: 9.769
+      selector:
+        number:
+          min: 0.01
+          max: 20
+          step: 0.001
+          mode: box
+    solar_surplus_threshold_w:
+      name: Solar surplus threshold
+      description: Minimum grid export used as measured solar surplus when a grid meter is supplied; solar production is used only when grid power is unavailable.
+      default: 500
+      selector:
+        number:
+          min: 0
+          max: 20000
+          step: 50
+          unit_of_measurement: W
+    flexible_load_power_w:
+      name: Flexible load power
+      description: Optional electrical demand of the flexible load in watts. When set, measured surplus is compared with the actual load demand and partial surplus can be combined with grid electricity.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 50000
+          unit_of_measurement: W
+          mode: box
+
+    language:
+      name: Advice language
+      description: Language for the returned recommendation.
+      default: en
+      selector:
+        select:
+          options:
+            - en
+            - nl

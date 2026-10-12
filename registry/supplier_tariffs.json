@@ -1,0 +1,392 @@
+{
+  "schema_version": 1,
+  "revision": 2,
+  "published_at": "2026-09-28T00:00:00Z",
+  "country": "NL",
+  "currency": "EUR",
+  "suppliers": {
+    "zonneplan": {
+      "name": "Zonneplan",
+      "tariffs": [
+        {
+          "valid_from": null,
+          "valid_until": "2026-07-31",
+          "purchase_fee_import": 0.02,
+          "purchase_fee_export": 0.02,
+          "fixed_monthly_fee_electricity": 6.25,
+          "vat_included": true,
+          "export_vat_included": true,
+          "settlement_resolution": "hourly",
+          "source_type": "official",
+          "source_url": "https://www.zonneplan.nl/blog/kwartierprijzen-bij-zonneplan",
+          "last_verified": "2026-07-03",
+          "notes": "Legacy bundled snapshot; original contract start is unknown. Values have not been freshly verified as a complete tariff. Check your contract.",
+          "feed_in_fee": 0,
+          "imbalance_fee": null,
+          "profile_version": 2,
+          "supports_hourly_prices": true,
+          "supports_quarter_hour_prices": true
+        },
+        {
+          "valid_from": "2026-08-01",
+          "valid_until": null,
+          "purchase_fee_import": 0.02,
+          "purchase_fee_export": 0.02,
+          "fixed_monthly_fee_electricity": 6.25,
+          "vat_included": true,
+          "export_vat_included": true,
+          "settlement_resolution": "quarter_hour",
+          "source_type": "official",
+          "source_url": "https://www.zonneplan.nl/energie/dynamisch-energiecontract",
+          "last_verified": "2026-07-03",
+          "notes": "Import fee EUR 0.02 including VAT and quarter-hour pricing checked 2026-09-23. Monthly/export values retained; full tariff verification date not advanced. Zonnebonus is not modeled.",
+          "feed_in_fee": 0,
+          "imbalance_fee": null,
+          "profile_version": 2,
+          "supports_hourly_prices": true,
+          "supports_quarter_hour_prices": true
+        }
+      ]
+    },
+    "tibber": {
+      "name": "Tibber",
+      "tariffs": [
+        {
+          "valid_from": null,
+          "valid_until": "2026-08-31",
+          "purchase_fee_import": 0.0248,
+          "purchase_fee_export": 0.0248,
+          "fixed_monthly_fee_electricity": 5.99,
+          "vat_included": true,
+          "export_vat_included": true,
+          "settlement_resolution": "hourly",
+          "source_type": "official",
+          "source_url": "https://tibber.com/nl/energiecontract",
+          "last_verified": "2026-07-03",
+          "notes": "Legacy bundled snapshot; original contract start is unknown. Values have not been freshly verified as a complete tariff. Check your contract.",
+          "feed_in_fee": 0,
+          "imbalance_fee": null,
+          "profile_version": 2,
+          "supports_hourly_prices": true,
+          "supports_quarter_hour_prices": false
+        },
+        {
+          "valid_from": "2026-09-01",
+          "valid_until": null,
+          "purchase_fee_import": 0.018,
+          "purchase_fee_export": 0.018,
+          "fixed_monthly_fee_electricity": 6.99,
+          "vat_included": true,
+          "export_vat_included": true,
+          "settlement_resolution": "quarter_hour",
+          "source_type": "official",
+          "source_url": "https://tibber.com/nl/energiecontract",
+          "last_verified": "2026-09-23",
+          "notes": "Published standard tariff from 2026-09-01. Older contracts may retain their agreed monthly fee; use Custom supplier for contract-specific rates. See https://support.tibber.com/nl/articles/5605892-de-kosten-bij-tibber",
+          "feed_in_fee": 0,
+          "imbalance_fee": null,
+          "profile_version": 2,
+          "supports_hourly_prices": true,
+          "supports_quarter_hour_prices": true
+        }
+      ]
+    },
+    "anwb_energie": {
+      "name": "ANWB Energie",
+      "tariffs": [
+        {
+          "valid_from": null,
+          "valid_until": null,
+          "purchase_fee_import": 0.018,
+          "purchase_fee_export": 0.018,
+          "fixed_monthly_fee_electricity": 8.5,
+          "vat_included": true,
+          "export_vat_included": true,
+          "settlement_resolution": "hourly",
+          "source_type": "official",
+          "source_url": "https://www.anwb.nl/energie/actuele-tarieven",
+          "last_verified": "2026-07-03",
+          "notes": "Import EUR 0.018 incl VAT, monthly EUR 8.50 incl VAT and hourly settlement checked 2026-09-23; see https://www.anwb.nl/energie/hoe-werkt-anwb-energie . Export fee remains unverified legacy data; complete-record last_verified retained.",
+          "feed_in_fee": 0,
+          "imbalance_fee": null,
+          "profile_version": 2,
+          "supports_hourly_prices": true,
+          "supports_quarter_hour_prices": false
+        }
+      ]
+    },
+    "easy_energy": {
+      "name": "EasyEnergy",
+      "tariffs": [
+        {
+          "valid_from": null,
+          "valid_until": "2026-09-22",
+          "purchase_fee_import": 0.0218,
+          "purchase_fee_export": 0.0218,
+          "fixed_monthly_fee_electricity": 7,
+          "vat_included": true,
+          "export_vat_included": true,
+          "settlement_resolution": "hourly",
+          "source_type": "secondary",
+          "source_url": "https://jeroen.nl/dynamische-energie/aanbieders",
+          "last_verified": "2026-07-02",
+          "notes": "Legacy bundled snapshot; original contract start is unknown. Values have not been freshly verified as a complete tariff. Check your contract.",
+          "feed_in_fee": 0,
+          "imbalance_fee": null,
+          "profile_version": 2,
+          "supports_hourly_prices": true,
+          "supports_quarter_hour_prices": false
+        },
+        {
+          "valid_from": "2026-09-23",
+          "valid_until": null,
+          "purchase_fee_import": 0.02178,
+          "purchase_fee_export": 0.0218,
+          "fixed_monthly_fee_electricity": 7,
+          "vat_included": true,
+          "export_vat_included": true,
+          "settlement_resolution": "quarter_hour",
+          "source_type": "official",
+          "source_url": "https://www.easyenergy.com/klantenservice/onze-tarieven",
+          "last_verified": "2026-07-02",
+          "notes": "Import EUR 0.02178 incl VAT, monthly EUR 7 incl VAT and quarter-hour settlement checked 2026-09-23. This is an observation date, not a proven contract effective date. Export EUR 0.0218 remains unverified legacy data. https://www.easyenergy.com/media/nsfhjtjd/tarievenblad.pdf describes a purchase fee on monthly net consumption; a flat interval export deduction cannot represent that netting. No additional feed-in costs does not establish purchase_fee_export. Complete-record last_verified retained.",
+          "feed_in_fee": 0,
+          "imbalance_fee": null,
+          "profile_version": 2,
+          "supports_hourly_prices": true,
+          "supports_quarter_hour_prices": true
+        }
+      ]
+    },
+    "eneco": {
+      "name": "Eneco",
+      "tariffs": [
+        {
+          "valid_from": null,
+          "valid_until": null,
+          "purchase_fee_import": 0.0241,
+          "purchase_fee_export": 0.0241,
+          "fixed_monthly_fee_electricity": 7,
+          "vat_included": true,
+          "export_vat_included": true,
+          "settlement_resolution": "hourly",
+          "source_type": "secondary",
+          "source_url": "https://jeroen.nl/dynamische-energie/aanbieders",
+          "last_verified": "2026-07-02",
+          "notes": "Legacy secondary amounts retained after 2026-09-23 review. https://www.eneco.nl/duurzame-energie/dynamisch-energiecontract/dynamische-tarieven/ confirms the mechanism, not exact universal current fees. Contract start unknown; no new complete-record verification.",
+          "feed_in_fee": 0,
+          "imbalance_fee": null,
+          "profile_version": 2,
+          "supports_hourly_prices": true,
+          "supports_quarter_hour_prices": false
+        }
+      ]
+    },
+    "vandebron": {
+      "name": "Vandebron",
+      "tariffs": [
+        {
+          "valid_from": null,
+          "valid_until": null,
+          "purchase_fee_import": 0.0257,
+          "purchase_fee_export": 0.0257,
+          "fixed_monthly_fee_electricity": 6.25,
+          "vat_included": true,
+          "export_vat_included": true,
+          "settlement_resolution": "hourly",
+          "source_type": "official",
+          "source_url": "https://vandebron.nl/energie/energiecontract/dynamisch",
+          "last_verified": "2026-07-03",
+          "notes": "EUR 0.0257 retained. A EUR 0.02 example is not sufficient evidence for a universal contract fee. Manual verification required.",
+          "feed_in_fee": 0,
+          "imbalance_fee": null,
+          "profile_version": 2,
+          "supports_hourly_prices": true,
+          "supports_quarter_hour_prices": false
+        }
+      ]
+    },
+    "vattenfall": {
+      "name": "Vattenfall",
+      "tariffs": [
+        {
+          "valid_from": null,
+          "valid_until": null,
+          "purchase_fee_import": 0.0255,
+          "purchase_fee_export": 0.0255,
+          "fixed_monthly_fee_electricity": 7.95,
+          "vat_included": true,
+          "export_vat_included": true,
+          "settlement_resolution": "hourly",
+          "source_type": "secondary",
+          "source_url": "https://jeroen.nl/dynamische-energie/aanbieders",
+          "last_verified": "2026-07-02",
+          "notes": "Legacy secondary amounts retained. Official information at https://www.vattenfall.nl/energie/dynamisch-energiecontract/zonnepanelen/ reviewed 2026-09-23 was insufficient to establish a complete replacement tariff, its effective date and the exact mapping to EnerPrice purchase_fee_export semantics. The review date is not a tariff validity boundary. Original contract start remains unknown; last_verified is not advanced. Check your contract.",
+          "feed_in_fee": 0,
+          "imbalance_fee": null,
+          "profile_version": 2,
+          "supports_hourly_prices": true,
+          "supports_quarter_hour_prices": false
+        }
+      ]
+    },
+    "greenchoice": {
+      "name": "Greenchoice",
+      "tariffs": [
+        {
+          "valid_from": null,
+          "valid_until": "2026-09-22",
+          "purchase_fee_import": 0.0224,
+          "purchase_fee_export": 0.0224,
+          "fixed_monthly_fee_electricity": 7.5,
+          "vat_included": true,
+          "export_vat_included": true,
+          "settlement_resolution": "hourly",
+          "source_type": "secondary",
+          "source_url": "https://jeroen.nl/dynamische-energie/aanbieders",
+          "last_verified": "2026-07-02",
+          "notes": "Legacy bundled snapshot; original contract start is unknown. Values have not been freshly verified as a complete tariff. Check your contract.",
+          "feed_in_fee": 0,
+          "imbalance_fee": null,
+          "profile_version": 2,
+          "supports_hourly_prices": true,
+          "supports_quarter_hour_prices": false
+        },
+        {
+          "valid_from": "2026-09-23",
+          "valid_until": null,
+          "purchase_fee_import": 0.0224,
+          "purchase_fee_export": 0.0224,
+          "fixed_monthly_fee_electricity": 7.5,
+          "vat_included": true,
+          "export_vat_included": true,
+          "settlement_resolution": "quarter_hour",
+          "source_type": "secondary",
+          "source_url": "https://jeroen.nl/dynamische-energie/aanbieders",
+          "last_verified": "2026-07-02",
+          "notes": "Numeric fees remain secondary/unverified. Quarter-hour settlement verified 2026-09-23 at https://www.greenchoice.nl/stroom-en-gas/dynamisch-energiecontract/ . Observation date is not a confirmed contract start.",
+          "feed_in_fee": 0,
+          "imbalance_fee": null,
+          "profile_version": 2,
+          "supports_hourly_prices": true,
+          "supports_quarter_hour_prices": true
+        }
+      ]
+    },
+    "energyzero": {
+      "name": "EnergyZero",
+      "tariffs": [
+        {
+          "valid_from": "2026-01-01",
+          "valid_until": null,
+          "purchase_fee_import": 0.028,
+          "purchase_fee_export": 0.0224,
+          "fixed_monthly_fee_electricity": 7.5,
+          "vat_included": false,
+          "export_vat_included": true,
+          "settlement_resolution": "quarter_hour",
+          "source_type": "official",
+          "source_url": "https://support.energyzero.nl/hc/nl/articles/7986421808285-Hoe-is-de-inkoopvergoeding-opgebouwd-voor-consumenten",
+          "last_verified": "2026-07-02",
+          "notes": "2026 import fee verified 2026-09-23: EUR 0.028 excluding VAT (0.03388 at 21%). Export fee and monthly fee remain unverified legacy values INCLUDING VAT. Quarter-hour change: https://www.energyzero.nl/actuele-prijzen . No certified pre-2026 tariff history is bundled; legacy fallback is kept separately.",
+          "feed_in_fee": 0,
+          "imbalance_fee": null,
+          "profile_version": 2,
+          "supports_hourly_prices": true,
+          "supports_quarter_hour_prices": true
+        }
+      ]
+    },
+    "samsam": {
+      "name": "SamSam",
+      "tariffs": [
+        {
+          "valid_from": null,
+          "valid_until": "2026-09-22",
+          "purchase_fee_import": 0.0339,
+          "purchase_fee_export": 0.0339,
+          "fixed_monthly_fee_electricity": 7.99,
+          "vat_included": true,
+          "export_vat_included": true,
+          "settlement_resolution": "hourly",
+          "source_type": "secondary",
+          "source_url": "https://jeroen.nl/dynamische-energie/aanbieders",
+          "last_verified": "2026-07-02",
+          "notes": "Legacy bundled snapshot; original contract start is unknown. Values have not been freshly verified as a complete tariff. Check your contract.",
+          "feed_in_fee": 0,
+          "imbalance_fee": null,
+          "profile_version": 2,
+          "supports_hourly_prices": true,
+          "supports_quarter_hour_prices": false
+        },
+        {
+          "valid_from": "2026-09-23",
+          "valid_until": null,
+          "purchase_fee_import": 0.021118,
+          "purchase_fee_export": 0.0339,
+          "fixed_monthly_fee_electricity": 7.99,
+          "vat_included": true,
+          "export_vat_included": true,
+          "settlement_resolution": "hourly",
+          "source_type": "official",
+          "source_url": "https://samsam.nu/groene-energie",
+          "last_verified": "2026-07-02",
+          "notes": "Import EUR 0.021118 incl VAT, monthly EUR 7.99 per connection and hourly settlement verified 2026-09-23. This is an observation date, not a proven contract effective date. Export EUR 0.0339 is retained solely as required legacy data, not officially verified and not inferred from import. Complete-record last_verified retained because export remains unverified.",
+          "feed_in_fee": 0,
+          "imbalance_fee": null,
+          "profile_version": 2,
+          "supports_hourly_prices": true,
+          "supports_quarter_hour_prices": false
+        }
+      ]
+    },
+    "pure_energie": {
+      "name": "Pure Energie",
+      "tariffs": [
+        {
+          "valid_from": null,
+          "valid_until": null,
+          "purchase_fee_import": 0.01699,
+          "purchase_fee_export": -0.01299,
+          "fixed_monthly_fee_electricity": 6.05,
+          "vat_included": true,
+          "export_vat_included": true,
+          "settlement_resolution": "hourly",
+          "source_type": "official",
+          "source_url": "https://pure-energie.nl/groene-stroom/tarieven",
+          "last_verified": "2026-07-11",
+          "notes": "Legacy amounts and negative export sign retained after 2026-09-23 review. https://pure-energie.nl/kennisbank/inkoop-en-verkoopvergoeding-dynamisch-contract/ confirms the mechanism, not exact current customer amounts. Check Mijn Pure Energie or your contract; complete-record last_verified not advanced.",
+          "feed_in_fee": 0,
+          "imbalance_fee": null,
+          "profile_version": 2,
+          "supports_hourly_prices": true,
+          "supports_quarter_hour_prices": false
+        }
+      ]
+    },
+    "custom": {
+      "name": "Eigen leverancier",
+      "tariffs": [
+        {
+          "valid_from": null,
+          "valid_until": null,
+          "purchase_fee_import": 0,
+          "purchase_fee_export": 0,
+          "fixed_monthly_fee_electricity": 0,
+          "vat_included": true,
+          "export_vat_included": true,
+          "settlement_resolution": "hourly",
+          "source_type": "manual",
+          "source_url": null,
+          "last_verified": null,
+          "notes": "User options take precedence; no verification metadata required.",
+          "feed_in_fee": 0,
+          "imbalance_fee": null,
+          "profile_version": 2,
+          "supports_hourly_prices": true,
+          "supports_quarter_hour_prices": true
+        }
+      ]
+    }
+  }
+}

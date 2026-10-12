@@ -38,7 +38,8 @@ class ProviderResult:
     @property
     def prices(self) -> list[PriceEntry]:
         """Return today and tomorrow prices."""
-        return sorted([*self.prices_today, *self.prices_tomorrow], key=lambda item: item.time)
+        # Absolute time preserves interval order across the repeated DST hour.
+        return sorted([*self.prices_today, *self.prices_tomorrow], key=lambda item: item.time.timestamp())
 
     @property
     def raw_prices(self) -> list[PriceEntry]:
@@ -67,6 +68,13 @@ class PriceData:
     errors: dict[str, str] = field(default_factory=dict)
     cache_age_minutes: float | None = None
     data_completeness: str = "unknown"
+    cache_rollover_used: bool = False
+    cache_source_date: str | None = None
+
+    @property
+    def api_data_available(self) -> bool:
+        """Current-day availability does not depend on tomorrow publication."""
+        return bool(self.result.prices_today)
 
 
 def convert_to_eur_kwh(value: float, unit: str) -> float:

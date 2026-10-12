@@ -1,23 +1,64 @@
 name: CI
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches:
       - main
+
+permissions:
+  contents: read
 
 jobs:
   lint-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Install test dependencies
-        run: python -m pip install --upgrade pip ruff pytest pytest-asyncio aiohttp
+        run: python -m pip install --upgrade pip ruff pytest pytest-asyncio aiohttp pyyaml jinja2
       - name: Ruff
         run: ruff check .
       - name: Pytest
         run: pytest
+      - name: Registry validation
+        run: python scripts/audit_supplier_registry.py --validate-only
+      - name: Registry revision guard
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha }}
+        run: python scripts/audit_supplier_registry.py --validate-only --compare-ref "$BASE_REF"
+      - name: Audit issue lifecycle tests (mocked GitHub API)
+        run: node --test tests/test_supplier_audit_issue.cjs
 
+  release:
+    needs: lint-test
+    if: >-
+      github.repository == 'LenFaki/home-assistant-nl-day-ahead-prices' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: enerprice-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Publish only an eligible tested version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_RESULT: ${{ needs.lint-test.result }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: python scripts/release.py --publish

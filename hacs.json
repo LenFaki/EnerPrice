@@ -2,7 +2,8 @@
   "name": "EnerPrice",
   "content_in_root": false,
   "render_readme": true,
-  "domains": ["sensor", "binary_sensor", "number", "switch"],
-  "country": ["NL"],
+  "country": [
+    "NL"
+  ],
   "homeassistant": "2024.6.0"
 }

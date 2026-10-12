@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from math import ceil
 from typing import Any
@@ -47,22 +48,30 @@ def optimize_intervals(
     *,
     require_consecutive: bool = True,
     alternatives: int = 3,
+    resolution_minutes: int | None = None,
+    window_filter: Callable[[list[PriceEntry]], bool] | None = None,
 ) -> dict[str, Any] | None:
     """Select the cheapest intervals for a requested duration."""
     if duration_minutes <= 0 or not prices:
         return None
-    minutes = interval_minutes(prices)
+    minutes = resolution_minutes if resolution_minutes is not None else interval_minutes(prices)
+    if minutes not in (15, 60) and resolution_minutes is not None:
+        raise ValueError("Explicit resolution must be 15 or 60 minutes")
     count = ceil(duration_minutes / minutes)
     if len(prices) < count:
         return None
     if require_consecutive:
         candidates = _consecutive_candidates(prices, count, minutes)
+        if window_filter is not None:
+            candidates = [candidate for candidate in candidates if window_filter(candidate)]
         if not candidates:
             return None
         ranked = sorted(candidates, key=lambda entries: _average(entries))
         selected = ranked[0]
         other = ranked[1 : alternatives + 1]
     else:
+        if window_filter is not None:
+            raise ValueError("Window filters require consecutive planning")
         selected = sorted(prices, key=lambda item: (item.price, item.time))[:count]
         selected.sort(key=lambda item: item.time)
         other = []

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -14,7 +15,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .cache import cache_is_valid, cache_needs_roll
+from .cache import cache_is_valid, get_cached_prices_for_date
 from .const import (
     CACHE_VERSION,
     CONF_COUNTRY,
@@ -35,7 +36,6 @@ from .const import (
     PROVIDER_ENTSOE,
     PROVIDER_NORD_POOL,
     RUNTIME_DEFAULTS,
-    UPDATE_INTERVAL,
 )
 from .models import PriceData, PriceEntry, ProviderResult
 from .price_resolution import (
@@ -53,7 +53,7 @@ from .providers import (
     ProviderError,
     async_fetch_with_fallback,
 )
-from .supplier_profiles import load_supplier_profiles
+from .supplier_registry import get_supplier_profiles, supplier_update_mode
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -66,22 +66,51 @@ class NLDayAheadPricesCoordinator(DataUpdateCoordinator[PriceData]):
             hass,
             logger=_LOGGER,
             name=DOMAIN,
-            update_interval=UPDATE_INTERVAL,
+            update_interval=None,
         )
         self.entry = entry
         self.store: Store[dict[str, Any]] = Store(hass, CACHE_VERSION, f"{DOMAIN}_{entry.entry_id}")
         merged = {**entry.data, **entry.options}
+        self.configured_options = dict(merged)
+        self.registry_manager = None
         self.runtime_options = {key: merged.get(key, value) for key, value in RUNTIME_DEFAULTS.items()}
         self._remove_interval_listener = None
+        self._remove_refresh_listener = None
+        self.fetch_diagnostics: dict[str, Any] = {}
         self.analysis_cache: dict[str, Any] = {}
 
     async def async_start(self) -> None:
         """Start exact interval-boundary state updates without an API fetch."""
+        self._remove_refresh_listener = async_track_utc_time_change(
+            self.hass, self._async_scheduled_refresh, minute=7, second=0
+        )
         resolution = self._effective_price_resolution(self._requested_price_resolution(), dt_util.now())
         minute = [0, 15, 30, 45] if resolution == "quarter_hour" else 0
         self._remove_interval_listener = async_track_utc_time_change(
             self.hass, self._async_interval_boundary, minute=minute, second=0
         )
+
+    async def _async_scheduled_refresh(self, now: datetime) -> None:
+        await self.async_request_refresh()
+
+    def registry_updated(self) -> None:
+        """Recompute from source intervals, without a market-price API request."""
+        self.analysis_cache.clear()
+        if self.data is not None:
+            source = replace(
+                self.data.result,
+                prices_today=self.data.result.source_prices_today,
+                prices_tomorrow=self.data.result.source_prices_tomorrow,
+            )
+            self.data = replace(self.data, result=self._convert_result_resolution(source, dt_util.now()))
+        if self._remove_interval_listener is not None:
+            self._remove_interval_listener()
+            resolution = self._effective_price_resolution(self._requested_price_resolution(), dt_util.now())
+            self._remove_interval_listener = async_track_utc_time_change(
+                self.hass, self._async_interval_boundary,
+                minute=[0, 15, 30, 45] if resolution == "quarter_hour" else 0, second=0,
+            )
+        self.async_update_listeners()
 
     async def _async_interval_boundary(self, now: datetime) -> None:
         """Notify entities at a market interval boundary."""
@@ -102,6 +131,9 @@ class NLDayAheadPricesCoordinator(DataUpdateCoordinator[PriceData]):
 
     async def async_stop(self) -> None:
         """Stop the interval-boundary listener."""
+        if self._remove_refresh_listener is not None:
+            self._remove_refresh_listener()
+            self._remove_refresh_listener = None
         if self._remove_interval_listener is not None:
             self._remove_interval_listener()
             self._remove_interval_listener = None
@@ -115,13 +147,17 @@ class NLDayAheadPricesCoordinator(DataUpdateCoordinator[PriceData]):
         try:
             result, fallback_used, errors = await async_fetch_with_fallback(providers, today, tomorrow)
         except ProviderError as err:
+            self.fetch_diagnostics = {"today_fetch_status": "failed", "tomorrow_fetch_status": "unknown", "provider_errors": err.errors, "cache_status": "cache_unavailable", "tomorrow_prices_expected_later": True}
             cached = await self._async_load_cached()
             if cached is not None:
+                cached.errors.update(err.errors)
+                self.fetch_diagnostics["cache_status"] = cached.data_completeness
                 cached.errors["cache_reason"] = str(err)
                 return cached
             raise UpdateFailed(str(err)) from err
 
         result = self._convert_result_resolution(result, now)
+        self.fetch_diagnostics = {"today_fetch_status": "success", "tomorrow_fetch_status": "success" if result.prices_tomorrow else "not_available", "provider_errors": errors, "tomorrow_prices_expected_later": not bool(result.prices_tomorrow)}
         data = PriceData(
             result=result,
             fallback_used=fallback_used,
@@ -129,6 +165,13 @@ class NLDayAheadPricesCoordinator(DataUpdateCoordinator[PriceData]):
             data_completeness=_data_completeness(result, today),
         )
         await self._async_store_cached(data)
+        # Options/registry can change while storage yields; publish using the current view.
+        requested = self._requested_price_resolution()
+        if (result.requested_price_resolution != requested
+                or result.effective_price_resolution != self._effective_price_resolution(requested, dt_util.now())):
+            data.result = self._convert_result_resolution(replace(
+                result, prices_today=result.source_prices_today, prices_tomorrow=result.source_prices_tomorrow,
+            ), dt_util.now())
         data.errors = errors
         return data
 
@@ -182,46 +225,35 @@ class NLDayAheadPricesCoordinator(DataUpdateCoordinator[PriceData]):
 
     async def _async_load_cached(self) -> PriceData | None:
         cached = await self.store.async_load()
-        if cached is None:
-            return None
         now = dt_util.now()
-        if cache_is_valid(cached, now):
-            return self._price_data_from_cache(cached, now, rolled=False)
-        if cache_needs_roll(cached, now):
-            # Cache was written yesterday, but its "tomorrow" prices are
-            # today's: bridge the midnight gap instead of going unavailable.
-            return self._price_data_from_cache(cached, now, rolled=True)
-        return None
-
-    def _price_data_from_cache(self, cached: dict[str, Any], now: datetime, *, rolled: bool) -> PriceData | None:
-        today_key, tomorrow_key = ("prices_tomorrow", None) if rolled else ("prices_today", "prices_tomorrow")
-        raw_today_key, raw_tomorrow_key = (
-            ("raw_prices_tomorrow", None) if rolled else ("raw_prices_today", "raw_prices_tomorrow")
-        )
+        if not cache_is_valid(cached, now):
+            return None
+        current = get_cached_prices_for_date(cached, now.date())
+        following = get_cached_prices_for_date(cached, now.date() + timedelta(days=1))
         result = ProviderResult(
             provider=PROVIDER_CACHE,
-            prices_today=_deserialize_prices(cached.get(today_key, [])),
-            prices_tomorrow=_deserialize_prices(cached.get(tomorrow_key, [])) if tomorrow_key else [],
-            raw_prices_today=_deserialize_prices(cached.get(raw_today_key, [])),
-            raw_prices_tomorrow=_deserialize_prices(cached.get(raw_tomorrow_key, [])) if raw_tomorrow_key else [],
+            prices_today=_deserialize_prices(current["raw_prices"]),
+            prices_tomorrow=_deserialize_prices(following["raw_prices"]),
             raw_price_resolution=cached.get("raw_price_resolution", "hourly"),
             requested_price_resolution=cached.get("requested_price_resolution", DEFAULT_PRICE_RESOLUTION),
             effective_price_resolution=cached.get("effective_price_resolution", "hourly"),
             resolution_converted=bool(cached.get("resolution_converted", False)),
-            raw_today=None if rolled else cached.get("raw_today"),
-            raw_tomorrow=None if rolled else cached.get("raw_tomorrow"),
+            raw_today=cached.get("raw_tomorrow") if current["rollover_used"] else cached.get("raw_today"),
+            raw_tomorrow=None if current["rollover_used"] else cached.get("raw_tomorrow"),
         )
         if not result.prices_today:
             return None
         last_update = cached.get("last_successful_update")
         parsed_update = datetime.fromisoformat(last_update) if last_update else None
         return PriceData(
-            result=result,
+            result=self._convert_result_resolution(result, now),
             fallback_used=True,
             last_successful_update=parsed_update,
             from_cache=True,
             cache_age_minutes=(now - parsed_update).total_seconds() / 60 if parsed_update else None,
-            data_completeness=_data_completeness(result, now.date()),
+            data_completeness=current["status"],
+            cache_rollover_used=current["rollover_used"],
+            cache_source_date=cached.get("local_date"),
         )
 
     def _convert_result_resolution(self, result: ProviderResult, now: datetime) -> ProviderResult:
@@ -259,7 +291,7 @@ class NLDayAheadPricesCoordinator(DataUpdateCoordinator[PriceData]):
         options = self.entry.options
         data = self.entry.data
         selected_supplier = options.get(CONF_SELECTED_SUPPLIER, data.get(CONF_SELECTED_SUPPLIER, DEFAULT_SELECTED_SUPPLIER))
-        profiles = load_supplier_profiles()
+        profiles = get_supplier_profiles(now, mode=supplier_update_mode({**data, **options}))
         profile = profiles.get(selected_supplier) or profiles.get(DEFAULT_SELECTED_SUPPLIER)
         if profile is None:
             return "hourly"

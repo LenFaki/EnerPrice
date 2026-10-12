@@ -37,7 +37,7 @@ DESCRIPTIONS = (
     PriceBinaryDescription(
         key="api_data_available",
         translation_key="api_data_available",
-        value_fn=lambda data, coordinator, entry: bool(data.result.prices_today),
+        value_fn=lambda data, coordinator, entry: data.api_data_available,
     ),
     PriceBinaryDescription(
         key="best_price_period",
