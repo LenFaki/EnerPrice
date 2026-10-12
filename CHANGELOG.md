@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased - Sell price sensor
+
+### Added
+- Add a Current Sell Price sensor: the market price including VAT minus the supplier's export and feed-in fees, the same calculation used by the Export Advisor.
+- Add `sell_prices_today` and `sell_prices_tomorrow` chart attributes and `sell_price`/`supplier_export_fee` attributes to price sensors.
+
+### Fixed
+- A `null` JSON body from a price provider is now retried and reported as an empty response instead of failing later during parsing.
+- The `cheapest_*` block attributes and the new sell-price arrays are excluded from Recorder history, like the other large price arrays.
+
 ## Unreleased - v2.6 Daily Energy Advisor, PR2
 
 ### Added
@@ -303,18 +313,6 @@ All notable changes to **EnerPrice** are documented here.
 
 - Added the Pure Energie supplier profile. Thanks to Henk van Donge for the
   contribution.
-
-### Fixed
-
-- Fixed the Energy-Charts fallback provider dropping or misplacing the first
-  1-2 hours of every day: prices are now bucketed and requested by NL local
-  day (Europe/Amsterdam) instead of the UTC calendar date.
-- Fixed a not-yet-published day (e.g. Nord Pool tomorrow prices before their
-  publication time) causing a hard provider failure; empty/non-JSON
-  responses are now retried like other transient errors.
-- Fixed the local cache being discarded entirely right after midnight even
-  when it already held today's prices (as yesterday's "tomorrow"), which
-  could blank every sensor until the next successful fetch.
 
 ## v2.0.0 - EnerPrice branding
 
