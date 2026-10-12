@@ -89,7 +89,7 @@ def test_incomplete_records_are_not_promoted_to_current():
         ("eneco", 0.0241, 0.0241, 7),
         ("vattenfall", 0.0255, 0.0255, 7.95),
         ("greenchoice", 0.0224, 0.0224, 7.5),
-        ("pure_energie", 0.01699, -0.01299, 6.05),
+        ("pure_energie", 0.01699, 0.01299, 6.05),
         ("energyzero", 0.028, 0.0224, 7.5),
     ],
 )

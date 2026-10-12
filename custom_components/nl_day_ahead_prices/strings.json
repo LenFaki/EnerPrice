@@ -68,7 +68,8 @@
           "custom_purchase_fee_electricity": "Electricity purchase fee",
           "custom_purchase_fee_includes_vat": "Purchase fee includes VAT",
           "custom_sell_fee_electricity": "Electricity sell fee",
-          "custom_sell_fee_includes_vat": "Sell fee includes VAT"
+          "custom_sell_fee_includes_vat": "Sell fee includes VAT",
+          "custom_sell_market_price_includes_vat": "Feed-in market price is paid including VAT"
         }
       },
       "smart_setup": {

@@ -5,6 +5,7 @@ import pytest
 from custom_components.nl_day_ahead_prices.calculations import (
     build_sell_price_attributes,
     calculate_sell_price,
+    export_entries_for_supplier,
 )
 from custom_components.nl_day_ahead_prices.models import (
     PriceEntry,
@@ -13,6 +14,7 @@ from custom_components.nl_day_ahead_prices.models import (
     next_hour_price,
 )
 from custom_components.nl_day_ahead_prices.supplier_profiles import SupplierProfile
+from custom_components.nl_day_ahead_prices.supplier_registry import SUPPLIER_UPDATES_BUNDLED, get_supplier_tariff
 
 
 def test_convert_eur_mwh_to_eur_kwh() -> None:
@@ -100,3 +102,31 @@ def test_build_sell_price_attributes() -> None:
     result = build_sell_price_attributes(prices, profile, 0.21)
 
     assert result == [{"time": "2026-07-02T10:00:00+00:00", "price": round(0.1 * 1.21 - 0.02, 6)}]
+
+
+def test_sell_price_without_vat_on_market_price() -> None:
+    profile = _supplier_profile(purchase_fee_export=0.02, sell_market_price_includes_vat=False)
+
+    assert calculate_sell_price(0.1, profile, 0.21) == pytest.approx(0.1 - 0.02)
+
+
+def test_export_fee_vat_flag_is_independent_of_market_vat_flag() -> None:
+    profile = _supplier_profile(
+        purchase_fee_export=0.02, sell_fee_includes_vat=False, sell_market_price_includes_vat=False
+    )
+
+    assert calculate_sell_price(0.1, profile, 0.21) == pytest.approx(0.1 - 0.02 * 1.21)
+
+
+def test_export_entries_follow_market_vat_flag() -> None:
+    prices = [PriceEntry(datetime(2026, 7, 2, 10, tzinfo=timezone.utc), 0.1)]
+    profile = _supplier_profile(key="custom", purchase_fee_export=0.02, sell_market_price_includes_vat=False)
+
+    assert export_entries_for_supplier(prices, profile, 0.21)[0].price == pytest.approx(0.08)
+
+
+def test_pure_energie_sell_price_matches_supplier_app() -> None:
+    # Live prices from the Pure Energie app on 2026-10-12: market 0.18737, sell 0.17438 EUR/kWh.
+    profile = get_supplier_tariff("pure_energie", datetime(2026, 10, 12, tzinfo=timezone.utc), mode=SUPPLIER_UPDATES_BUNDLED)
+
+    assert calculate_sell_price(0.18737, profile, 0.21) == pytest.approx(0.17438)

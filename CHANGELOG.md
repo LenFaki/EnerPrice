@@ -3,10 +3,12 @@
 ## Unreleased - Sell price sensor
 
 ### Added
-- Add a Current Sell Price sensor: the market price including VAT minus the supplier's export and feed-in fees, the same calculation used by the Export Advisor.
+- Add a Current Sell Price sensor: the market price minus the supplier's export and feed-in fees, the same calculation used by the Export Advisor.
 - Add `sell_prices_today` and `sell_prices_tomorrow` chart attributes and `sell_price`/`supplier_export_fee` attributes to price sensors.
+- Add the optional registry field `export_market_vat_included` and the custom-supplier option `custom_sell_market_price_includes_vat` (both default on) for suppliers that pay the feed-in market price excluding VAT. The existing `export_vat_included` flag still only applies to the export fee.
 
 ### Fixed
+- Pure Energie sell prices: the market price is now paid out excluding VAT and the EUR 0.01299/kWh sell fee is deducted instead of added, matching the supplier's own prices.
 - A `null` JSON body from a price provider is now retried and reported as an empty response instead of failing later during parsing.
 - The `cheapest_*` block attributes and the new sell-price arrays are excluded from Recorder history, like the other large price arrays.
 

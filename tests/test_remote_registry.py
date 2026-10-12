@@ -162,7 +162,7 @@ async def test_invalid_envelope_preserves_good_cache(field, value):
 @pytest.mark.parametrize("field,value", [
     ("valid_from", "2026-02-30"), ("valid_until", "2026-99-01"),
     ("last_verified", "yesterday"), ("last_verified", "20260923"),
-    ("vat_included", 1), ("export_vat_included", "true"),
+    ("vat_included", 1), ("export_vat_included", "true"), ("export_market_vat_included", "false"),
     ("supports_hourly_prices", None), ("supports_quarter_hour_prices", 0),
     ("purchase_fee_import", float("nan")), ("purchase_fee_import", float("inf")),
     ("purchase_fee_import", "0.02"), ("purchase_fee_import", True),
@@ -247,7 +247,25 @@ def test_initial_remote_data_exactly_matches_bundle():
     bundled = json.loads(registry.REGISTRY_FILE.read_text())
     assert candidate["suppliers"] == bundled["suppliers"]
     assert remote.parse_remote_registry(candidate).revision == 1
-    assert remote.parse_remote_registry(candidate).suppliers["pure_energie"][0].purchase_fee_export == -0.01299
+    pure_energie = remote.parse_remote_registry(candidate).suppliers["pure_energie"][0]
+    assert pure_energie.purchase_fee_export == 0.01299
+    assert not pure_energie.sell_market_price_includes_vat
+
+
+def test_export_market_vat_flag_is_optional():
+    candidate = payload()
+    for supplier in candidate["suppliers"].values():
+        for record in supplier["tariffs"]:
+            record.pop("export_market_vat_included", None)
+    parsed = remote.parse_remote_registry(candidate)
+    assert all(p.sell_market_price_includes_vat for profiles in parsed.suppliers.values() for p in profiles)
+
+
+def test_unknown_tariff_field_is_still_rejected():
+    candidate = payload()
+    candidate["suppliers"]["anwb_energie"]["tariffs"][0]["unexpected"] = True
+    with pytest.raises(ValueError):
+        remote.parse_remote_registry(candidate)
 
 
 def test_custom_and_date_fallback():

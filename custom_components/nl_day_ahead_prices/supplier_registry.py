@@ -130,6 +130,7 @@ def parse_registry(payload: Any) -> SupplierRegistry:
             for field in (
                 "vat_included",
                 "export_vat_included",
+                "export_market_vat_included",
                 "supports_hourly_prices",
                 "supports_quarter_hour_prices",
             ):
@@ -154,6 +155,7 @@ def parse_registry(payload: Any) -> SupplierRegistry:
                     "price_resolution": record["settlement_resolution"],
                     "purchase_fee_includes_vat": record["vat_included"],
                     "sell_fee_includes_vat": record.get("export_vat_included", record["vat_included"]),
+                    "sell_market_price_includes_vat": record.get("export_market_vat_included", True),
                 },
                 key,
             )
