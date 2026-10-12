@@ -6,9 +6,9 @@
 
 **Language:** English | [Nederlands](README.nl.md)
 
-**Development preview:** [Daily Energy Advisor PR1](docs/daily-advisor.md) adds opt-in
-Forecast.Solar inputs and data-quality sensors. Daily recommendations, dashboard
-generation, notifications and savings verification are not part of this first PR.
+**Development preview:** [Daily Energy Advisor PR2](docs/daily-advisor-pr2.md) adds
+opt-in consumption windows, conditional solar advice and a three-day dashboard.
+Notifications and realized-savings verification remain reserved for PR3.
 
 [![GitHub Release](https://img.shields.io/github/v/release/LenFaki/home-assistant-nl-day-ahead-prices?style=flat-square)](https://github.com/LenFaki/home-assistant-nl-day-ahead-prices/releases)
 [![Status](https://img.shields.io/badge/status-stable-green.svg?style=flat-square)](https://github.com/LenFaki/home-assistant-nl-day-ahead-prices)

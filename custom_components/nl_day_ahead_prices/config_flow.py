@@ -31,9 +31,11 @@ from .const import (
     CONF_CUSTOM_SUPPLIER_NAME,
     CONF_DAILY_ADVISOR_ENABLED,
     CONF_DAILY_CONSUMPTION_ENTITIES,
+    CONF_DAILY_DURATION_MINUTES,
     CONF_DAILY_FORECAST_ENTITIES,
     CONF_DAILY_GRID_POWER_ENTITY,
     CONF_DAILY_SOLAR_ENERGY_ENTITY,
+    CONF_DAILY_SOLAR_POWER_ENTITY,
     CONF_ELECTRIC_EFFICIENCY,
     CONF_ENABLE_ENTSOE,
     CONF_ENERGY_TAX,
@@ -228,13 +230,15 @@ class NLDayAheadPricesOptionsFlow(config_entries.OptionsFlow):
                 return self.async_create_entry(title="", data=candidate)
             data = candidate
         schema = {
+            vol.Optional(CONF_DAILY_DURATION_MINUTES, default=data.get(CONF_DAILY_DURATION_MINUTES, 60)):
+                NumberSelector(NumberSelectorConfig(min=15, max=1440, step=15, unit_of_measurement="min", mode=NumberSelectorMode.BOX)),
             vol.Optional(CONF_DAILY_FORECAST_ENTITIES, default=data.get(CONF_DAILY_FORECAST_ENTITIES, [])):
                 EntitySelector(EntitySelectorConfig(domain="sensor", integration="forecast_solar", device_class="energy", multiple=True)),
             vol.Optional(CONF_DAILY_CONSUMPTION_ENTITIES, default=data.get(CONF_DAILY_CONSUMPTION_ENTITIES, [])):
                 EntitySelector(EntitySelectorConfig(domain="sensor", device_class="energy", multiple=True)),
         }
         # Lists of at most one entity allow explicit clearing with an empty list.
-        for key, device_class in ((CONF_DAILY_GRID_POWER_ENTITY, "power"), (CONF_DAILY_SOLAR_ENERGY_ENTITY, "energy")):
+        for key, device_class in ((CONF_DAILY_GRID_POWER_ENTITY, "power"), (CONF_DAILY_SOLAR_ENERGY_ENTITY, "energy"), (CONF_DAILY_SOLAR_POWER_ENTITY, "power")):
             schema[vol.Optional(key, default=data.get(key, []))] = EntitySelector(
                 EntitySelectorConfig(domain="sensor", device_class=device_class, multiple=True)
             )

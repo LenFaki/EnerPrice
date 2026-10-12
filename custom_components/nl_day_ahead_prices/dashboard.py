@@ -14,6 +14,8 @@ def generate_dashboard_yaml(
     include_ev_planner: bool = False,
     include_battery_strategy: bool = False,
     include_smart_energy: bool = True,
+    include_daily_advisor: bool = False,
+    use_apexcharts: bool = True,
     theme: str = "auto",
     language: str = "auto",
     entity_ids: dict[str, str] | None = None,
@@ -201,7 +203,7 @@ def generate_dashboard_yaml(
 {advisor_card}{''.join(tiles)}{load_card}"""
 
     graph = ""
-    if dashboard_type in {"full", "energy_advisor"}:
+    if use_apexcharts and dashboard_type in {"full", "energy_advisor"}:
         graph = f"""
       - type: grid
         cards:
@@ -232,6 +234,7 @@ def generate_dashboard_yaml(
               batterijplanner. De planner wijzigt apparaten niet zelfstandig.
 """
 
+    daily_cards = _daily_cards(ids, lang, use_apexcharts) if include_daily_advisor else ""
     return f"""{theme_line}title: EnerPrice
 views:
   - title: {labels["view"]}
@@ -244,7 +247,95 @@ views:
           - type: heading
             heading: {labels["heading"]}
             icon: mdi:lightning-bolt-circle
-{advisor}{price_tiles}{planner_note}{smart_cards}{details}{graph}"""
+{advisor}{price_tiles}{planner_note}{smart_cards}{details}{graph}{daily_cards}"""
+
+
+def _daily_cards(ids, language, use_apexcharts):
+    """Only use resolved Daily Advisor IDs; core cards work without custom cards."""
+    nl = language == "nl"
+    title = "Dagelijks energieadvies" if nl else "Daily Energy Advisor"
+    advisor = ids.get("daily_energy_advice")
+    if not advisor:
+        return f"""
+      - type: grid
+        cards:
+          - type: markdown
+            title: {title}
+            content: {"Schakel Daily Advisor in en controleer of de entiteiten beschikbaar zijn." if nl else "Enable Daily Advisor and check that its entities are available."}
+"""
+    tiles = ""
+    for key, name in (
+        ("solar_forecast_today", "Zonneprognose vandaag" if nl else "Solar forecast today"),
+        ("solar_forecast_tomorrow", "Zonneprognose morgen" if nl else "Solar forecast tomorrow"),
+        ("best_consumption_window", "Beste gebruiksvenster" if nl else "Best consumption window"),
+        ("daily_forecast_quality", "Datakwaliteit" if nl else "Data quality"),
+    ):
+        if ids.get(key):
+            tiles += f"""          - type: tile
+            entity: {ids[key]}
+            name: {name}
+"""
+    unknown = "onbekend" if nl else "unknown"
+    price_labels = "{'known':'bekend','partial':'gedeeltelijk','unknown':'onbekend'}" if nl else "{'known':'known','partial':'partial','unknown':'unknown'}"
+    confidence_labels = "{'medium':'middel','low':'laag'}" if nl else "{'medium':'medium','low':'low'}"
+    reference_labels = ("{'earliest_remaining_grid_window':'eerste mogelijke netstroomvenster','same_window_grid_only':'hetzelfde venster volledig op netstroom'}" if nl else
+                        "{'earliest_remaining_grid_window':'earliest remaining grid window','same_window_grid_only':'same window entirely on grid supply'}")
+    cards = f"""
+      - type: grid
+        cards:
+          - type: heading
+            heading: {title}
+            icon: mdi:solar-power
+{tiles}          - type: markdown
+            title: {"Adviezen en driedaagse vooruitblik" if nl else "Advice and three-day outlook"}
+            content: |-
+              {{{{ state_attr('{advisor}', 'summary') | default('{unknown}', true) }}}}
+              {{% for item in (state_attr('{advisor}', 'advice') or [])[:3] %}}
+              **{{{{ as_timestamp(item.start) | timestamp_custom('%d-%m %H:%M %z') }}}} - {{{{ as_timestamp(item.end) | timestamp_custom('%H:%M %z') }}}}**
+              {{{{ item.reason }}}}
+              {"Betrouwbaarheid" if nl else "Confidence"}: {{{{ {confidence_labels}.get(item.confidence, '{unknown}') }}}}.
+              {{% if item.estimated_cost_eur is not none %}}
+              {"Geschatte kosten" if nl else "Estimated cost"}: EUR {{{{ item.estimated_cost_eur }}}}.
+              {"Hypothetisch verschil" if nl else "Hypothetical difference"}: EUR {{{{ item.estimated_impact_eur }}}} {"ten opzichte van" if nl else "versus"} {{{{ {reference_labels}.get(item.reference, '{unknown}') }}}}.
+              {{% else %}}
+              {"Financiele impact onbekend: configureer apparaatvermogen." if nl else "Financial impact unknown: configure appliance power."}
+              {{% endif %}}
+              {{% endfor %}}
+
+              | {"Dag | Stroomprijzen | Zonneprognose (kWh)" if nl else "Day | Electricity prices | Solar forecast (kWh)"} |
+              | --- | --- | --- |
+              {{% for day in state_attr('{advisor}', 'days') or [] %}}
+              | {{{{ day.date }}}} | {{{{ {price_labels}.get(day.price_status, '{unknown}') }}}} | {{{{ day.solar_energy_kwh if day.solar_energy_kwh is not none else '{unknown}' }}}} |
+              {{% endfor %}}
+
+              {"Zonneproductie is geen beschikbaar overschot. Dit is geen aangetoonde besparing." if nl else "Solar production is not available surplus. This is not demonstrated savings."}
+              {{{{ state_attr('{advisor}', 'heat_cost_note') | default('', true) }}}}
+"""
+    if use_apexcharts:
+        cards += f"""          - type: custom:apexcharts-card
+            graph_span: 73h
+            span:
+              start: day
+            yaxis:
+              - id: price
+                decimals: 3
+              - id: solar
+                opposite: true
+            series:
+              - entity: {advisor}
+                name: All-in
+                unit: EUR/kWh
+                yaxis_id: price
+                data_generator: |
+                  return (entity.attributes.chart ?? []).map(p => [new Date(p.time).getTime(), p.price]);
+              - entity: {advisor}
+                name: {"Zonneprognose" if nl else "Solar forecast"}
+                unit: kW
+                yaxis_id: solar
+                data_generator: |
+                  return (entity.attributes.chart ?? []).map(p => [new Date(p.time).getTime(), p.solar_kw]);
+"""
+    return cards
 
 def generate_automation_yaml(
     automation_type: str,

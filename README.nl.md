@@ -6,9 +6,9 @@
 
 **Taal:** [English](README.md) | Nederlands
 
-**Ontwikkelpreview:** [Daily Energy Advisor PR1](docs/daily-advisor.md) voegt optionele
-Forecast.Solar-invoer en datakwaliteitssensoren toe. Dagelijkse adviezen,
-dashboardgeneratie, meldingen en besparingscontrole volgen in afzonderlijke PR's.
+**Ontwikkelpreview:** [Daily Energy Advisor PR2](docs/daily-advisor-pr2.md) voegt
+optionele gebruiksvensters, voorwaardelijk zonneadvies en een driedaags dashboard
+toe. Meldingen en controle van gerealiseerde besparingen volgen in PR3.
 
 EnerPrice is een HACS-compatibele custom integratie voor Home Assistant voor
 Nederlandse dynamische energieprijzen. De integratie heette eerder **NL Day

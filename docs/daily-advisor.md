@@ -1,5 +1,9 @@
 # Daily Energy Advisor: PR1 development preview
 
+This page records the PR1 foundation. For the current advice and dashboard
+extension, see [Daily Advisor PR2](daily-advisor-pr2.md). PR1 contracts remain
+available; notifications and savings verification still belong to PR3.
+
 This is the forecast/configuration foundation for v2.6, not the complete advisor.
 Manifest and project versions remain 2.5.4. Existing installations are unchanged
 until the user explicitly enables **Daily Advisor forecasts (preview)** in options.

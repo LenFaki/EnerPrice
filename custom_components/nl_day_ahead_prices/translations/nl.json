@@ -27,7 +27,7 @@
           "enable_entsoe": "Optionele ENTSO-E fallback inschakelen",
           "entsoe_api_token": "ENTSO-E API-token",
           "selected_supplier": "Leverancier",
-          "daily_advisor_enabled": "Daily Advisor-zonneprognoses inschakelen (preview)",
+          "daily_advisor_enabled": "Daily Advisor inschakelen (preview)",
           "supplier_tariff_updates": "Leverancierstarieven bijwerken",
           "price_resolution": "Prijsinterval",
           "energy_tax": "Energiebelasting per kWh",
@@ -38,8 +38,10 @@
       },
       "daily_advisor": {
         "title": "Daily Advisor: zonneprognoses",
-        "description": "PR1: zonneprognoses en datakwaliteit, nog geen dagelijks advies of meldingen. Kies per Forecast.Solar-installatie uitsluitend het dagtotaal van vandaag en morgen, niet resterende opwek of uurwaarden. Kies elke fysieke installatie eenmaal. Lege selecties zijn toegestaan.",
+        "description": "Dagelijkse gebruiksvensters en zonneprognoses, zonder apparaatbediening of meldingen. Gebruik het apparaatvermogen uit Smart Setup en stel hier de gebruiksduur in. Selecteer alleen Forecast.Solar-dagtotalen van vandaag en morgen. Optioneel: verse net- en zonneproductiemetingen voor een voorwaardelijk zonnescenario; productie is geen overschot.",
         "data": {
+          "daily_solar_power_entity": "Werkelijke zonneproductie (maximaal één sensor, W/kW)",
+          "daily_duration_minutes": "Gebruiksduur flexibel apparaat",
           "daily_forecast_entities": "Forecast.Solar-dagtotalen",
           "daily_grid_power_entity": "Netvermogen (maximaal één sensor, W/kW)",
           "daily_solar_energy_entity": "Werkelijke zonne-energie (maximaal één sensor, Wh/kWh)",
@@ -94,6 +96,7 @@
       }
     },
     "error": {
+      "daily_invalid_duration": "Kies 15 tot 1440 minuten, in stappen van 15 minuten.",
       "daily_invalid_forecast": "Kies uitsluitend het dagtotaal van vandaag of morgen uit Forecast.Solar.",
       "daily_duplicate_forecast": "Dezelfde installatie en dag zijn meerdere keren geselecteerd.",
       "daily_invalid_unit": "De sensor ontbreekt of heeft een onjuiste apparaatklasse of eenheid.",
@@ -337,6 +340,8 @@
       "name": "EnerPrice-dashboard maken",
       "description": "Maak Lovelace-YAML die handmatig in een dashboard kan worden geplakt.",
       "fields": {
+        "include_daily_advisor": {"name": "Daily Advisor tonen", "description": "Optioneel: gebruiksvensters, zonneprognoses en driedaagse vooruitblik."},
+        "use_apexcharts": {"name": "ApexCharts gebruiken", "description": "Schakel uit voor een dashboard met alleen ingebouwde kaarten."},
         "dashboard_type": {
           "name": "Dashboardtype",
           "description": "Kies een compact, volledig of adviesdashboard."
@@ -404,6 +409,8 @@
   },
   "entity": {
     "sensor": {
+      "daily_energy_advice": {"name": "Dagelijks energieadvies", "state": {"ready": "Advies beschikbaar", "unavailable": "Onvoldoende gegevens"}},
+      "best_consumption_window": {"name": "Beste gebruiksvenster"},
       "solar_forecast_today": {"name":"Zonneprognose vandaag"},
       "solar_forecast_tomorrow": {"name":"Zonneprognose morgen"},
       "daily_forecast_quality": {"name":"Datakwaliteit zonneprognose","state":{"partial":"Gedeeltelijk beschikbaar","unavailable":"Niet beschikbaar"}},

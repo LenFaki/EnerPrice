@@ -36,6 +36,20 @@ def build_all_in_price_attributes_for_supplier(
     return [item.as_attribute() for item in all_in_entries_for_supplier(prices, energy_tax, supplier_profile, vat)]
 
 
+def export_entries_for_supplier(prices: list[PriceEntry], supplier_profile: SupplierProfile, vat: float) -> list[PriceEntry]:
+    """Apply existing export-fee semantics at each interval's local tariff date."""
+    profiles = {}
+    result = []
+    for item in prices:
+        day = market_date(item.time)
+        if day not in profiles:
+            profiles[day] = supplier_profile
+            if supplier_profile.key != "custom" and supplier_profile.registry_source != "custom":
+                profiles[day] = get_supplier_tariff(supplier_profile.key, day, mode=supplier_profile.tariff_registry_mode) or supplier_profile
+        result.append(PriceEntry(item.time, item.price * (1 + vat) - calculate_supplier_export_fee(profiles[day], vat)))
+    return result
+
+
 def calculate_supplier_fee(profile: SupplierProfile | dict[str, Any] | None, vat: float) -> float:
     """Return the supplier purchase fee including VAT in EUR/kWh."""
     normalized = normalize_supplier_profile(profile)

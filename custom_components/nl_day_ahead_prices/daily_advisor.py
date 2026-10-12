@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import timedelta
+from datetime import timedelta, timezone
 
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
@@ -14,10 +14,14 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    CONF_ADVICE_LANGUAGE,
     CONF_DAILY_CONSUMPTION_ENTITIES,
+    CONF_DAILY_DURATION_MINUTES,
     CONF_DAILY_FORECAST_ENTITIES,
     CONF_DAILY_GRID_POWER_ENTITY,
     CONF_DAILY_SOLAR_ENERGY_ENTITY,
+    CONF_DAILY_SOLAR_POWER_ENTITY,
+    CONF_FLEXIBLE_LOAD_POWER_W,
     DOMAIN,
 )
 from .solar_forecast import (
@@ -37,6 +41,49 @@ from .solar_forecast import (
 _LOGGER = logging.getLogger(__name__)
 
 
+def advisor_context(coordinator):
+    """Compose the existing price engine with PR1's local forecast snapshot."""
+    daily = getattr(coordinator, "daily_forecast", None)
+    if daily is None:
+        return None
+    from .calculations import export_entries_for_supplier
+    from .sensor import _selected_supplier_profile, _vat
+
+    options = {**coordinator.entry.data, **coordinator.entry.options}
+    data = coordinator.data
+    exports = export_entries_for_supplier(data.result.prices, _selected_supplier_profile(coordinator.entry), _vat(coordinator.entry)) if data else []
+    return {"forecast": daily.snapshot(), "export_prices": exports,
+            "duration_minutes": options.get(CONF_DAILY_DURATION_MINUTES, 60),
+            "resolution_minutes": 15 if data and data.result.effective_price_resolution == "quarter_hour" else 60}
+
+
+def daily_advice(coordinator, language=None):
+    """One cached result shared by the new Daily Advisor entities."""
+    from .sensor import _cached_all_in_entries
+    from .smart_energy import build_smart_energy_advice
+
+    options = {**coordinator.entry.data, **coordinator.entry.options}
+    language = language or options.get(CONF_ADVICE_LANGUAGE, "auto")
+    if language == "auto":
+        language = coordinator.hass.config.language
+    now = dt_util.utcnow()
+    prices = _cached_all_in_entries(coordinator, coordinator.data, coordinator.entry) if coordinator.data else []
+    # Absolute timestamps avoid Python's same-zone repeated-hour comparisons.
+    from .models import PriceEntry
+
+    utc_prices = [PriceEntry(item.time.astimezone(timezone.utc), item.price) for item in prices]
+    signature = (id(prices), id(coordinator.daily_forecast.data), int(now.timestamp() // 60), repr(options), language)
+    cache = getattr(coordinator, "analysis_cache", {})
+    if cache.get("daily_advice", (None,))[0] != signature:
+        result = build_smart_energy_advice(
+            electricity_price=None, future_prices=utc_prices, now=now,
+            flexible_load_power_w=options.get(CONF_FLEXIBLE_LOAD_POWER_W), language=language,
+            daily_context=advisor_context(coordinator),
+        )["daily_advisor"]
+        cache["daily_advice"] = (signature, result)
+    return cache["daily_advice"][1]
+
+
 def selected_entities(options):
     """Return bounded, unique entity IDs for listeners and registry inspection."""
     return list(dict.fromkeys([
@@ -44,6 +91,7 @@ def selected_entities(options):
         *options.get(CONF_DAILY_CONSUMPTION_ENTITIES, [])[:MAX_INSTALLATIONS],
         *options.get(CONF_DAILY_GRID_POWER_ENTITY, [])[:1],
         *options.get(CONF_DAILY_SOLAR_ENERGY_ENTITY, [])[:1],
+        *options.get(CONF_DAILY_SOLAR_POWER_ENTITY, [])[:1],
     ]))
 
 
@@ -51,6 +99,9 @@ def validate_daily_inputs(hass, options):
     """Check registry identity, duplicate installation roles and sensor units."""
     registry = er.async_get(hass)
     errors = {}
+    duration = options.get(CONF_DAILY_DURATION_MINUTES, 60)
+    if type(duration) not in (int, float) or not 15 <= duration <= 1440 or duration % 15:
+        errors[CONF_DAILY_DURATION_MINUTES] = "daily_invalid_duration"
     seen = set()
     forecast_ids = options.get(CONF_DAILY_FORECAST_ENTITIES, [])
     if len(forecast_ids) > MAX_INSTALLATIONS * 2:
@@ -73,10 +124,11 @@ def validate_daily_inputs(hass, options):
         (CONF_DAILY_FORECAST_ENTITIES, forecast_ids, "energy", ENERGY_UNITS),
         (CONF_DAILY_GRID_POWER_ENTITY, options.get(CONF_DAILY_GRID_POWER_ENTITY, []), "power", POWER_UNITS),
         (CONF_DAILY_SOLAR_ENERGY_ENTITY, options.get(CONF_DAILY_SOLAR_ENERGY_ENTITY, []), "energy", ENERGY_UNITS),
+        (CONF_DAILY_SOLAR_POWER_ENTITY, options.get(CONF_DAILY_SOLAR_POWER_ENTITY, []), "power", POWER_UNITS),
         (CONF_DAILY_CONSUMPTION_ENTITIES, consumption, "energy", ENERGY_UNITS),
     ]
     for field, ids, device_class, units in groups:
-        if field in (CONF_DAILY_GRID_POWER_ENTITY, CONF_DAILY_SOLAR_ENERGY_ENTITY) and len(ids) > 1:
+        if field in (CONF_DAILY_GRID_POWER_ENTITY, CONF_DAILY_SOLAR_ENERGY_ENTITY, CONF_DAILY_SOLAR_POWER_ENTITY) and len(ids) > 1:
             errors[field] = "daily_single_entity"
         for entity_id in ids:
             if not entity_id:
@@ -128,6 +180,7 @@ class DailyForecastCoordinator(DataUpdateCoordinator):
         groups = [
             ("grid_power", self.options.get(CONF_DAILY_GRID_POWER_ENTITY, [])[:1], "power", POWER_UNITS, "W"),
             ("solar_energy", self.options.get(CONF_DAILY_SOLAR_ENERGY_ENTITY, [])[:1], "energy", ENERGY_UNITS, "kWh"),
+            ("solar_power", self.options.get(CONF_DAILY_SOLAR_POWER_ENTITY, [])[:1], "power", POWER_UNITS, "W"),
             ("consumption_energy", self.options.get(CONF_DAILY_CONSUMPTION_ENTITIES, [])[:MAX_INSTALLATIONS], "energy", ENERGY_UNITS, "kWh"),
         ]
         for role, entity_ids, device_class, units, unit in groups:
