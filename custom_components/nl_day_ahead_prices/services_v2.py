@@ -297,6 +297,8 @@ def _dashboard_entity_ids(hass: HomeAssistant, config_entry_id: str) -> dict[str
             "solar_forecast_tomorrow",
             "daily_forecast_quality",
             "daily_energy_advice",
+            "daily_notification_status",
+            "daily_energy_performance",
             "best_consumption_window",
         ):
             if entity.unique_id.endswith(f"_{key}"):

@@ -10,7 +10,46 @@ from .const import DOMAIN
 
 
 def daily_advice_entities(coordinator, entry):
-    return [DailyAdviceSensor(coordinator, entry, key) for key in ("daily_energy_advice", "best_consumption_window")]
+    entities = [DailyAdviceSensor(coordinator, entry, key) for key in ("daily_energy_advice", "best_consumption_window")]
+    if getattr(coordinator, "daily_delivery", None) is not None:
+        entities.extend(DailyDeliverySensor(coordinator, entry, key) for key in ("daily_notification_status", "daily_energy_performance"))
+    return entities
+
+
+class DailyDeliverySensor(CoordinatorEntity, SensorEntity):
+    """Small latest-day summaries, never raw history or inferred realized savings."""
+
+    _attr_has_entity_name = True
+    _attr_device_class = SensorDeviceClass.ENUM
+
+    def __init__(self, coordinator, entry, key):
+        super().__init__(coordinator.daily_forecast)
+        self.delivery = coordinator.daily_delivery
+        self.key = key
+        self._attr_unique_id = f"{entry.entry_id}_{key}"
+        self._attr_translation_key = key
+        self._attr_device_info = {"identifiers": {(DOMAIN, entry.entry_id)}, "name": "EnerPrice", "manufacturer": "EnerPrice"}
+        self._attr_options = (["loading", "disabled", "awaiting_consent", "invalid_target", "scheduled", "claimed", "sent", "failed", "storage_error"]
+                              if key == "daily_notification_status" else ["collecting", "comparable", "incomplete", "storage_error"])
+
+    @property
+    def available(self):
+        return True
+
+    @property
+    def native_value(self):
+        result = self.delivery.snapshot()
+        if self.key == "daily_notification_status":
+            return result["notification_state"]
+        return result["performance"]["state"] if result["storage_state"] == "ready" else "storage_error"
+
+    @property
+    def extra_state_attributes(self):
+        result = self.delivery.snapshot()
+        if self.key == "daily_energy_performance":
+            return {**result["performance"], "retention_days": result["retention_days"], "stored_days": result["stored_days"],
+                    "storage_state": result["storage_state"]}
+        return {key: value for key, value in result.items() if key not in ("performance", "notification_state")}
 
 
 class DailyAdviceSensor(CoordinatorEntity, SensorEntity):

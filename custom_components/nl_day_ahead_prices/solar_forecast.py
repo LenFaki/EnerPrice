@@ -55,12 +55,12 @@ def numeric_state(state: Any, device_class: str, units: dict[str, float]) -> flo
     return value if isfinite(value) else None
 
 
-def state_quality(state: Any, now: datetime, max_age: timedelta) -> str | None:
+def state_quality(state: Any, now: datetime, max_age: timedelta, *, reported: bool = False) -> str | None:
     if state is None:
         return "missing"
     if state.attributes.get("restored"):
         return "restored"
-    updated = state.last_updated
+    updated = getattr(state, "last_reported", state.last_updated) if reported else state.last_updated
     if not isinstance(updated, datetime) or updated.tzinfo is None:
         return "unknown_timestamp"
     age = now.astimezone(timezone.utc) - updated.astimezone(timezone.utc)

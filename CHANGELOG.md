@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased - v2.6 Daily Energy Advisor, PR3
+
+### Added
+- Optional morning briefings through an explicitly selected Home Assistant notification target, with forecast production, today's best window and at most three existing advice records.
+- Separate notification preference and explicit target-bound consent. Existing Daily Advisor configurations remain notification-off; new configurations prefer notifications but never send without consent.
+- Local HA delivery time, a 30-minute catch-up window and confirmed durable at-most-once delivery claims across reloads, restarts and DST. Failed/uncertain attempts are not retried that day.
+- Cumulative grid import/export inputs and conservative forecast-versus-actual daily energy comparisons, using existing solar measurements and advice calculations.
+- Bounded local history: configurable 1-90 completed days (default 30), one current day, fixed-size entity summaries and atomic executor-based storage. Corrupt/unwritable storage disables delivery.
+- Notification Status and Energy Performance entities, optional dashboard cards, NL/EN text and upgrade/rollback documentation.
+
+### Data Quality And Compatibility
+- Potential financial differences remain separate from realized savings, which stay unknown without a verified counterfactual and execution evidence.
+- Missing/stale inputs, meter resets, missing day boundaries and restarted incomplete days do not become zero or measured daily totals.
+- Grid predictions are explicitly constant-load scenarios and require full-day forecast coverage; unavailable forecasts remain unknown.
+- Existing entity IDs, price calculations, services and default dashboards are unchanged. No device control, email, external API, version bump or release.
+
 ## Unreleased - v2.6 Daily Energy Advisor, PR2
 
 ### Added

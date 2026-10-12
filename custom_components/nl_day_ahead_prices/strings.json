@@ -37,15 +37,22 @@
         }
       },
       "daily_advisor": {
-        "title": "Daily Advisor: solar forecasts",
-        "description": "Daily consumption windows and solar forecasts, without device control or notifications. Uses appliance power from Smart Setup and the duration configured here. Select only today's and tomorrow's Forecast.Solar daily totals. Optional fresh grid and solar power measurements enable a conditional solar scenario; production is not surplus.",
+        "title": "Daily Advisor: advice and performance",
+        "description": "Advice without device control. Notifications require preference enabled, a selected Companion app or HA notification target and explicit consent. Check consent again when saving; otherwise delivery stops. Time uses the local HA timezone. Energy checks require cumulative total_increasing meters that do not reset daily. Missing measurements remain unknown; potential differences are not proven savings.",
         "data": {
           "daily_solar_power_entity": "Actual solar power (at most one sensor, W/kW)",
           "daily_duration_minutes": "Flexible appliance duration",
           "daily_forecast_entities": "Forecast.Solar daily totals",
           "daily_grid_power_entity": "Grid power (at most one sensor, W/kW)",
           "daily_solar_energy_entity": "Actual solar energy (at most one sensor, Wh/kWh)",
-          "daily_consumption_entities": "Consumption meters (Wh/kWh)"
+          "daily_consumption_entities": "Consumption meters (Wh/kWh)",
+          "daily_import_energy_entity": "Cumulative grid import (at most one sensor, Wh/kWh)",
+          "daily_export_energy_entity": "Cumulative grid export (at most one sensor, Wh/kWh)",
+          "daily_notify_enabled": "Prefer daily notifications",
+          "daily_notify_consent": "I consent to delivery to the selected target",
+          "daily_notify_target": "Notification target (empty means no target)",
+          "daily_notify_time": "Delivery time (local Home Assistant time)",
+          "daily_retention_days": "Completed days to retain (1-90)"
         }
       },
       "supplier_summary": {
@@ -105,7 +112,11 @@
       "invalid_vat": "VAT must be between 0 and 1",
       "negative_value": "This value cannot be negative",
       "supplier_profile_unavailable": "The selected supplier profile is unavailable",
-      "positive_value_required": "This value must be greater than zero"
+      "positive_value_required": "This value must be greater than zero",
+      "daily_invalid_retention": "Choose a whole number of days from 1 to 90.",
+      "daily_invalid_time": "Choose a valid local time with seconds set to 00.",
+      "daily_invalid_notify_target": "Choose an available Companion app or HA notification target.",
+      "daily_invalid_counter": "Choose a cumulative energy meter with state_class total_increasing."
     }
   },
   "selector": {
@@ -674,6 +685,29 @@
           "medium": "Medium",
           "high": "High",
           "exceptional": "Exceptional"
+        }
+      },
+      "daily_notification_status": {
+        "name": "Daily Notification Status",
+        "state": {
+          "loading": "Loading",
+          "disabled": "Disabled",
+          "awaiting_consent": "Awaiting consent",
+          "invalid_target": "Target unavailable",
+          "scheduled": "Scheduled",
+          "claimed": "Delivery attempt recorded",
+          "sent": "Submitted to Home Assistant",
+          "failed": "Delivery failed",
+          "storage_error": "Storage error"
+        }
+      },
+      "daily_energy_performance": {
+        "name": "Daily Energy Performance",
+        "state": {
+          "collecting": "Collecting",
+          "comparable": "Comparable",
+          "incomplete": "Incomplete",
+          "storage_error": "Storage error"
         }
       }
     },

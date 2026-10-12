@@ -412,6 +412,7 @@ async def test_options_flow_selector_defaults_and_cache_preview(monkeypatch, mod
                 "NumberSelectorMode": SimpleNamespace(BOX="box"),
                 "SelectSelector": lambda data: data,
                 "SelectSelectorConfig": dict,
+                "TimeSelector": lambda: {"time": {}},
             },
     }
     for name, attrs in modules.items():
@@ -470,6 +471,7 @@ def _load_config_flow_for_test(monkeypatch):
             "NumberSelectorMode": SimpleNamespace(BOX="box"),
             "SelectSelector": lambda data: data,
             "SelectSelectorConfig": dict,
+            "TimeSelector": lambda: {"time": {}},
         },
     }
     for name, attrs in modules.items():

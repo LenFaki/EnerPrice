@@ -179,7 +179,7 @@ def load_adapter(monkeypatch):
     registry = {"sensor.today": registered(), "sensor.tomorrow": registered(role="energy_production_tomorrow")}
     hass = SimpleNamespace(
         states=SimpleNamespace(get=states.get), registry=SimpleNamespace(async_get=registry.get),
-        services=SimpleNamespace(has_service=Mock(return_value=True), async_call=AsyncMock(return_value={"watts": {NOW.isoformat(): 100}, "wh_period": {NOW.isoformat(): 50}})),
+        services=SimpleNamespace(async_services=lambda: {}, has_service=Mock(return_value=True), async_call=AsyncMock(return_value={"watts": {NOW.isoformat(): 100}, "wh_period": {NOW.isoformat(): 50}})),
     )
     entry = SimpleNamespace(entry_id="test", data={}, options={CONF_DAILY_FORECAST_ENTITIES: ["sensor.today", "sensor.tomorrow"]})
     return SimpleNamespace(module=module, hass=hass, entry=entry, states=states, registry=registry, clock=clock, track=track)
@@ -266,6 +266,7 @@ async def test_options_opt_in_preserve_smart_settings_and_empty_forecast(monkeyp
     adapter = load_adapter(monkeypatch)
     original = {CONF_DAILY_ADVISOR_ENABLED: True, "smart_flexible_load_power_w": 1500, "selected_supplier": "zonneplan"}
     flow = _smart_setup_flow(module, original)
+    flow.config_entry = SimpleNamespace(data={}, options=original)
     flow.hass = adapter.hass
     form = await flow.async_step_smart_setup({"smart_setup_enabled": False})
     assert form["step_id"] == "daily_advisor"
@@ -344,6 +345,10 @@ async def test_entry_setup_nonblocking_and_optional_unload(adapter, monkeypatch,
     coordinator_module = ModuleType("custom_components.nl_day_ahead_prices.coordinator")
     coordinator_module.NLDayAheadPricesCoordinator = lambda hass, entry: price
     monkeypatch.setitem(sys.modules, coordinator_module.__name__, coordinator_module)
+    delivery = SimpleNamespace(async_start=AsyncMock(), async_stop=AsyncMock())
+    delivery_module = ModuleType("custom_components.nl_day_ahead_prices.daily_delivery")
+    delivery_module.DailyAdvisorDelivery = Mock(return_value=delivery)
+    monkeypatch.setitem(sys.modules, delivery_module.__name__, delivery_module)
     registry_module = ModuleType("custom_components.nl_day_ahead_prices.remote_registry")
     registry_module.async_get_manager = AsyncMock()
     registry_module.async_subscribe = Mock(return_value=Mock())
@@ -363,11 +368,12 @@ async def test_entry_setup_nonblocking_and_optional_unload(adapter, monkeypatch,
     hass.config_entries = SimpleNamespace(async_forward_entry_setups=AsyncMock(), async_unload_platforms=AsyncMock(return_value=True))
     assert await async_setup_entry(hass, entry)
     assert (price.daily_forecast is not None) == enabled
-    assert entry.async_create_background_task.call_count == int(enabled)
+    assert entry.async_create_background_task.call_count == 2 * int(enabled)
     hass.services.async_call.assert_not_awaited()
     assert await async_unload_entry(hass, entry)
     price.async_stop.assert_awaited_once()
     if enabled:
+        delivery.async_stop.assert_awaited_once()
         price.daily_forecast.async_shutdown.assert_awaited_once()
 
 
