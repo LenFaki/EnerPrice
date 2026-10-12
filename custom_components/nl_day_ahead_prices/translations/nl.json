@@ -27,12 +27,23 @@
           "enable_entsoe": "Optionele ENTSO-E fallback inschakelen",
           "entsoe_api_token": "ENTSO-E API-token",
           "selected_supplier": "Leverancier",
+          "daily_advisor_enabled": "Daily Advisor-zonneprognoses inschakelen (preview)",
           "supplier_tariff_updates": "Leverancierstarieven bijwerken",
           "price_resolution": "Prijsinterval",
           "energy_tax": "Energiebelasting per kWh",
           "energy_tax_incl_vat": "Energiebelasting inclusief btw",
           "supplier_markup_excl_vat": "Leveranciersopslag exclusief btw",
           "vat": "BTW"
+        }
+      },
+      "daily_advisor": {
+        "title": "Daily Advisor: zonneprognoses",
+        "description": "PR1: zonneprognoses en datakwaliteit, nog geen dagelijks advies of meldingen. Kies per Forecast.Solar-installatie uitsluitend het dagtotaal van vandaag en morgen, niet resterende opwek of uurwaarden. Kies elke fysieke installatie eenmaal. Lege selecties zijn toegestaan.",
+        "data": {
+          "daily_forecast_entities": "Forecast.Solar-dagtotalen",
+          "daily_grid_power_entity": "Netvermogen (maximaal één sensor, W/kW)",
+          "daily_solar_energy_entity": "Werkelijke zonne-energie (maximaal één sensor, Wh/kWh)",
+          "daily_consumption_entities": "Verbruiksmeters (Wh/kWh)"
         }
       },
       "supplier_summary": {
@@ -83,6 +94,11 @@
       }
     },
     "error": {
+      "daily_invalid_forecast": "Kies uitsluitend het dagtotaal van vandaag of morgen uit Forecast.Solar.",
+      "daily_duplicate_forecast": "Dezelfde installatie en dag zijn meerdere keren geselecteerd.",
+      "daily_invalid_unit": "De sensor ontbreekt of heeft een onjuiste apparaatklasse of eenheid.",
+      "daily_too_many_entities": "Selecteer maximaal acht installaties of verbruiksmeters.",
+      "daily_single_entity": "Selecteer maximaal één sensor of wis de selectie.",
       "invalid_vat": "BTW moet tussen 0 en 1 liggen",
       "negative_value": "Deze waarde mag niet negatief zijn",
       "supplier_profile_unavailable": "Het gekozen leveranciersprofiel is niet beschikbaar",
@@ -105,6 +121,10 @@
     }
   },
   "services": {
+    "get_daily_forecast": {
+      "name": "Zonneprognose ophalen",
+      "description": "Geeft lokaal beschikbare zonneprognoses en meetgegevens terug. Doet geen API-verzoek en berekent geen besparing."
+    },
     "export_chart_data": {
       "name": "Grafiekgegevens exporteren",
       "description": "Exporteer markt- of all-inprijzen voor ApexCharts.",
@@ -384,6 +404,9 @@
   },
   "entity": {
     "sensor": {
+      "solar_forecast_today": {"name":"Zonneprognose vandaag"},
+      "solar_forecast_tomorrow": {"name":"Zonneprognose morgen"},
+      "daily_forecast_quality": {"name":"Datakwaliteit zonneprognose","state":{"partial":"Gedeeltelijk beschikbaar","unavailable":"Niet beschikbaar"}},
       "supplier_tariff_status": {
         "name": "Status leverancierstarief",
         "state": {

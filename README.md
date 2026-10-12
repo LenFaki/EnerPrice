@@ -6,6 +6,10 @@
 
 **Language:** English | [Nederlands](README.nl.md)
 
+**Development preview:** [Daily Energy Advisor PR1](docs/daily-advisor.md) adds opt-in
+Forecast.Solar inputs and data-quality sensors. Daily recommendations, dashboard
+generation, notifications and savings verification are not part of this first PR.
+
 [![GitHub Release](https://img.shields.io/github/v/release/LenFaki/home-assistant-nl-day-ahead-prices?style=flat-square)](https://github.com/LenFaki/home-assistant-nl-day-ahead-prices/releases)
 [![Status](https://img.shields.io/badge/status-stable-green.svg?style=flat-square)](https://github.com/LenFaki/home-assistant-nl-day-ahead-prices)
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=flat-square)](https://hacs.xyz/)

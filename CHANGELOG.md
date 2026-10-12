@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased - v2.6 Daily Energy Advisor, PR1
+
+### Added
+- Opt-in Daily Advisor forecast configuration, independent of Smart Setup and disabled by default.
+- Local Forecast.Solar daily totals, conservative freshness checks and installation/day deduplication.
+- Solar Forecast Today, Solar Forecast Tomorrow and Forecast Data Quality sensors with Dutch/English translations.
+- Bounded `get_daily_forecast` response data, using Home Assistant's cached Forecast.Solar service when available.
+- Three Amsterdam calendar dates with unknown totals explicitly retained; no synthetic hourly forecasts or solar-surplus estimates.
+
+### Scope
+- This first PR covers configuration and forecast inputs only. Daily recommendations/dashboard additions and notifications/savings verification follow in separate PRs.
+- Existing pricing, supplier data, services, entity IDs, Smart Energy advice and dashboards remain unchanged.
+- Integration/project version remains 2.5.4; no release is published by this development change.
+
 ## 2.5.4 - 2026-10-01
 
 ### Fixed

@@ -31,6 +31,21 @@ def async_register_services(hass: HomeAssistant) -> None:
     from .services_v2 import async_register_v2_services
 
     async_register_v2_services(hass)
+    if not hass.services.has_service(DOMAIN, "get_daily_forecast"):
+        async def async_daily_forecast(call: ServiceCall) -> dict:
+            coordinator = _coordinator(hass)
+            daily = getattr(coordinator, "daily_forecast", None)
+            if daily is None:
+                return {"enabled": False, "days": [], "series": []}
+            # Return a copy; response consumers cannot mutate coordinator data.
+            from copy import deepcopy
+
+            return {"enabled": True, **deepcopy(daily.snapshot())}
+
+        hass.services.async_register(
+            DOMAIN, "get_daily_forecast", async_daily_forecast,
+            schema=vol.Schema({}), supports_response=SupportsResponse.ONLY,
+        )
     if hass.services.has_service(DOMAIN, EXPORT_SERVICE):
         return
 
@@ -85,6 +100,7 @@ def async_unregister_services(hass: HomeAssistant) -> None:
     """Remove services when the final entry unloads."""
     hass.services.async_remove(DOMAIN, EXPORT_SERVICE)
     hass.services.async_remove(DOMAIN, CONFIG_SERVICE)
+    hass.services.async_remove(DOMAIN, "get_daily_forecast")
     from .services_v2 import async_unregister_v2_services
 
     async_unregister_v2_services(hass)

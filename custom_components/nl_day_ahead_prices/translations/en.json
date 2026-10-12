@@ -27,12 +27,23 @@
           "enable_entsoe": "Enable optional ENTSO-E fallback",
           "entsoe_api_token": "ENTSO-E API token",
           "selected_supplier": "Supplier",
+          "daily_advisor_enabled": "Enable Daily Advisor forecasts (preview)",
           "supplier_tariff_updates": "Supplier tariff updates",
           "price_resolution": "Price interval",
           "energy_tax": "Energy tax per kWh",
           "energy_tax_incl_vat": "Energy tax including VAT",
           "supplier_markup_excl_vat": "Supplier markup excluding VAT",
           "vat": "VAT"
+        }
+      },
+      "daily_advisor": {
+        "title": "Daily Advisor: solar forecasts",
+        "description": "PR1: forecasts and data quality, not yet daily recommendations or notifications. For each Forecast.Solar installation select only today's and tomorrow's total energy, not remaining energy or hourly values. Select each physical installation once. Empty selections are allowed.",
+        "data": {
+          "daily_forecast_entities": "Forecast.Solar daily totals",
+          "daily_grid_power_entity": "Grid power (at most one sensor, W/kW)",
+          "daily_solar_energy_entity": "Actual solar energy (at most one sensor, Wh/kWh)",
+          "daily_consumption_entities": "Consumption meters (Wh/kWh)"
         }
       },
       "supplier_summary": {
@@ -83,6 +94,11 @@
       }
     },
     "error": {
+      "daily_invalid_forecast": "Select only today's or tomorrow's total energy from Forecast.Solar.",
+      "daily_duplicate_forecast": "The same installation and day were selected more than once.",
+      "daily_invalid_unit": "Sensor missing or incorrect device class or unit.",
+      "daily_too_many_entities": "Select at most eight installations or consumption meters.",
+      "daily_single_entity": "Select at most one sensor, or clear the selection.",
       "invalid_vat": "VAT must be between 0 and 1",
       "negative_value": "This value cannot be negative",
       "supplier_profile_unavailable": "The selected supplier profile is unavailable",
@@ -105,6 +121,10 @@
     }
   },
   "services": {
+    "get_daily_forecast": {
+      "name": "Get daily solar forecast",
+      "description": "Returns locally available solar forecasts and measurements. Does not request APIs or calculate savings."
+    },
     "export_chart_data": {
       "name": "Export chart data",
       "description": "Export market or all-in prices for ApexCharts.",
@@ -384,6 +404,9 @@
   },
   "entity": {
     "sensor": {
+      "solar_forecast_today": {"name":"Solar Forecast Today"},
+      "solar_forecast_tomorrow": {"name":"Solar Forecast Tomorrow"},
+      "daily_forecast_quality": {"name":"Forecast Data Quality","state":{"partial":"Partially available","unavailable":"Unavailable"}},
       "supplier_tariff_status": {
         "name": "Supplier Tariff Status",
         "state": {

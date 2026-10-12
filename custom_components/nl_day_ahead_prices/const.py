@@ -50,6 +50,18 @@ CONF_GAS_KWH_PER_M3 = "smart_gas_kwh_per_m3"
 CONF_SOLAR_SURPLUS_THRESHOLD_W = "smart_solar_surplus_threshold_w"
 CONF_ADVICE_LANGUAGE = "smart_advice_language"
 
+# Daily Advisor foundation (v2.6 development, opt-in).
+CONF_DAILY_ADVISOR_ENABLED = "daily_advisor_enabled"
+CONF_DAILY_FORECAST_ENTITIES = "daily_forecast_entities"
+CONF_DAILY_GRID_POWER_ENTITY = "daily_grid_power_entity"
+CONF_DAILY_SOLAR_ENERGY_ENTITY = "daily_solar_energy_entity"
+CONF_DAILY_CONSUMPTION_ENTITIES = "daily_consumption_entities"
+DAILY_INPUT_KEYS = (
+    CONF_DAILY_FORECAST_ENTITIES, CONF_DAILY_GRID_POWER_ENTITY,
+    CONF_DAILY_SOLAR_ENERGY_ENTITY, CONF_DAILY_CONSUMPTION_ENTITIES,
+)
+DAILY_FORECAST_DAYS = 3
+
 DEFAULT_COUNTRY = "NL"
 DEFAULT_CURRENCY = "EUR"
 DEFAULT_PRIMARY_PROVIDER = "nord_pool"

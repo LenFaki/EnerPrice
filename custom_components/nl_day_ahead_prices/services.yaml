@@ -1,3 +1,6 @@
+get_daily_forecast:
+  fields: {}
+
 export_chart_data:
   fields:
     include_today:
