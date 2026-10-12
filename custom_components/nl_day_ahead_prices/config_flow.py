@@ -17,6 +17,7 @@ from homeassistant.helpers.selector import (
     NumberSelectorMode,
     SelectSelector,
     SelectSelectorConfig,
+    TimeSelector,
 )
 
 from .const import (
@@ -32,8 +33,15 @@ from .const import (
     CONF_DAILY_ADVISOR_ENABLED,
     CONF_DAILY_CONSUMPTION_ENTITIES,
     CONF_DAILY_DURATION_MINUTES,
+    CONF_DAILY_EXPORT_ENERGY_ENTITY,
     CONF_DAILY_FORECAST_ENTITIES,
     CONF_DAILY_GRID_POWER_ENTITY,
+    CONF_DAILY_IMPORT_ENERGY_ENTITY,
+    CONF_DAILY_NOTIFY_CONSENT,
+    CONF_DAILY_NOTIFY_ENABLED,
+    CONF_DAILY_NOTIFY_TARGET,
+    CONF_DAILY_NOTIFY_TIME,
+    CONF_DAILY_RETENTION_DAYS,
     CONF_DAILY_SOLAR_ENERGY_ENTITY,
     CONF_DAILY_SOLAR_POWER_ENTITY,
     CONF_ELECTRIC_EFFICIENCY,
@@ -55,6 +63,7 @@ from .const import (
     CONF_SOLAR_SURPLUS_THRESHOLD_W,
     CONF_SUPPLIER_TARIFF_UPDATES,
     CONF_VAT,
+    DAILY_CONSENT_TARGET,
     DEFAULT_ADVICE_LANGUAGE,
     DEFAULT_COUNTRY,
     DEFAULT_CURRENCY,
@@ -219,17 +228,32 @@ class NLDayAheadPricesOptionsFlow(config_entries.OptionsFlow):
     async def async_step_daily_advisor(self, user_input=None):
         """Configure the opt-in forecast foundation independently of Smart Setup."""
         from .daily_advisor import validate_daily_inputs
+        from .daily_delivery import notification_preference, notification_targets, validate_delivery_options
 
         data = self._pending_options or self._current_options()
         errors = {}
         if user_input is not None:
             candidate = {**data, **user_input}
+            if CONF_DAILY_NOTIFY_CONSENT in user_input:
+                candidate[DAILY_CONSENT_TARGET] = candidate.get(CONF_DAILY_NOTIFY_TARGET) if user_input[CONF_DAILY_NOTIFY_CONSENT] is True else None
+            elif candidate.get(CONF_DAILY_NOTIFY_TARGET) != data.get(CONF_DAILY_NOTIFY_TARGET):
+                candidate[DAILY_CONSENT_TARGET] = None
             # Empty selections explicitly clear inputs; omitted fields preserve them.
             errors = validate_daily_inputs(self.hass, candidate)
+            errors.update(validate_delivery_options(self.hass, candidate))
             if not errors:
                 return self.async_create_entry(title="", data=candidate)
             data = candidate
+        targets = notification_targets(self.hass)
+        selected_target = data.get(CONF_DAILY_NOTIFY_TARGET, "")
         schema = {
+            vol.Optional(CONF_DAILY_NOTIFY_ENABLED, default=data.get(CONF_DAILY_NOTIFY_ENABLED, notification_preference(self._current_options()))): bool,
+            vol.Optional(CONF_DAILY_NOTIFY_CONSENT, default=False): bool,
+            vol.Optional(CONF_DAILY_NOTIFY_TARGET, default=selected_target if selected_target in targets else ""):
+                SelectSelector(SelectSelectorConfig(options=["", *targets])),
+            vol.Optional(CONF_DAILY_NOTIFY_TIME, default=data.get(CONF_DAILY_NOTIFY_TIME, "08:00:00")): TimeSelector(),
+            vol.Optional(CONF_DAILY_RETENTION_DAYS, default=data.get(CONF_DAILY_RETENTION_DAYS, 30)):
+                NumberSelector(NumberSelectorConfig(min=1, max=90, step=1, mode=NumberSelectorMode.BOX)),
             vol.Optional(CONF_DAILY_DURATION_MINUTES, default=data.get(CONF_DAILY_DURATION_MINUTES, 60)):
                 NumberSelector(NumberSelectorConfig(min=15, max=1440, step=15, unit_of_measurement="min", mode=NumberSelectorMode.BOX)),
             vol.Optional(CONF_DAILY_FORECAST_ENTITIES, default=data.get(CONF_DAILY_FORECAST_ENTITIES, [])):
@@ -238,7 +262,8 @@ class NLDayAheadPricesOptionsFlow(config_entries.OptionsFlow):
                 EntitySelector(EntitySelectorConfig(domain="sensor", device_class="energy", multiple=True)),
         }
         # Lists of at most one entity allow explicit clearing with an empty list.
-        for key, device_class in ((CONF_DAILY_GRID_POWER_ENTITY, "power"), (CONF_DAILY_SOLAR_ENERGY_ENTITY, "energy"), (CONF_DAILY_SOLAR_POWER_ENTITY, "power")):
+        for key, device_class in ((CONF_DAILY_GRID_POWER_ENTITY, "power"), (CONF_DAILY_SOLAR_ENERGY_ENTITY, "energy"), (CONF_DAILY_SOLAR_POWER_ENTITY, "power"),
+                                  (CONF_DAILY_IMPORT_ENERGY_ENTITY, "energy"), (CONF_DAILY_EXPORT_ENERGY_ENTITY, "energy")):
             schema[vol.Optional(key, default=data.get(key, []))] = EntitySelector(
                 EntitySelectorConfig(domain="sensor", device_class=device_class, multiple=True)
             )

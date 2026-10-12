@@ -37,15 +37,22 @@
         }
       },
       "daily_advisor": {
-        "title": "Daily Advisor: zonneprognoses",
-        "description": "Dagelijkse gebruiksvensters en zonneprognoses, zonder apparaatbediening of meldingen. Gebruik het apparaatvermogen uit Smart Setup en stel hier de gebruiksduur in. Selecteer alleen Forecast.Solar-dagtotalen van vandaag en morgen. Optioneel: verse net- en zonneproductiemetingen voor een voorwaardelijk zonnescenario; productie is geen overschot.",
+        "title": "Daily Advisor: advies en controle",
+        "description": "Advies zonder apparaatbediening. Meldingen vereisen voorkeur aan, een gekozen Companion-app- of HA-notificatiedoel en expliciete toestemming. Vink toestemming opnieuw aan bij opslaan; anders stopt verzending. Tijd is de lokale HA-tijd. Energiecontrole vereist cumulatieve total_increasing-meters die niet dagelijks resetten. Ontbrekende metingen blijven onbekend; potentieel verschil is geen bewezen besparing.",
         "data": {
           "daily_solar_power_entity": "Werkelijke zonneproductie (maximaal één sensor, W/kW)",
           "daily_duration_minutes": "Gebruiksduur flexibel apparaat",
           "daily_forecast_entities": "Forecast.Solar-dagtotalen",
           "daily_grid_power_entity": "Netvermogen (maximaal één sensor, W/kW)",
           "daily_solar_energy_entity": "Werkelijke zonne-energie (maximaal één sensor, Wh/kWh)",
-          "daily_consumption_entities": "Verbruiksmeters (Wh/kWh)"
+          "daily_consumption_entities": "Verbruiksmeters (Wh/kWh)",
+          "daily_import_energy_entity": "Cumulatieve netafname (maximaal één sensor, Wh/kWh)",
+          "daily_export_energy_entity": "Cumulatieve teruglevering (maximaal één sensor, Wh/kWh)",
+          "daily_notify_enabled": "Voorkeur voor dagelijkse melding",
+          "daily_notify_consent": "Ik geef toestemming voor verzending naar het gekozen doel",
+          "daily_notify_target": "Notificatiedoel (leeg is geen doel)",
+          "daily_notify_time": "Verzendtijd (lokale Home Assistant-tijd)",
+          "daily_retention_days": "Bewaartermijn afgesloten dagen (1-90)"
         }
       },
       "supplier_summary": {
@@ -105,7 +112,11 @@
       "invalid_vat": "BTW moet tussen 0 en 1 liggen",
       "negative_value": "Deze waarde mag niet negatief zijn",
       "supplier_profile_unavailable": "Het gekozen leveranciersprofiel is niet beschikbaar",
-      "positive_value_required": "Deze waarde moet groter zijn dan nul"
+      "positive_value_required": "Deze waarde moet groter zijn dan nul",
+      "daily_invalid_retention": "Kies een geheel aantal dagen van 1 tot en met 90.",
+      "daily_invalid_time": "Kies een geldige lokale tijd met seconden op 00.",
+      "daily_invalid_notify_target": "Kies een beschikbaar Companion-app- of HA-notificatiedoel.",
+      "daily_invalid_counter": "Kies een cumulatieve energiemeter met state_class total_increasing."
     }
   },
   "selector": {
@@ -674,6 +685,29 @@
           "medium": "Gemiddeld",
           "high": "Groot",
           "exceptional": "Uitzonderlijk"
+        }
+      },
+      "daily_notification_status": {
+        "name": "Dagelijkse notificatiestatus",
+        "state": {
+          "loading": "Laden",
+          "disabled": "Uitgeschakeld",
+          "awaiting_consent": "Wacht op toestemming",
+          "invalid_target": "Doel niet beschikbaar",
+          "scheduled": "Gepland",
+          "claimed": "Verzendpoging vastgelegd",
+          "sent": "Aangeboden aan Home Assistant",
+          "failed": "Verzending mislukt",
+          "storage_error": "Opslagfout"
+        }
+      },
+      "daily_energy_performance": {
+        "name": "Dagelijkse energiecontrole",
+        "state": {
+          "collecting": "Gegevens verzamelen",
+          "comparable": "Vergelijkbaar",
+          "incomplete": "Onvolledig",
+          "storage_error": "Opslagfout"
         }
       }
     },
