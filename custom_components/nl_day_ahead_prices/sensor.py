@@ -720,6 +720,11 @@ async def async_setup_entry(
     entities.extend(NLRegistryDiagnosticSensor(coordinator, entry, description) for description in REGISTRY_SENSORS)
     if _entry_options(entry).get(CONF_SMART_SETUP_ENABLED, False):
         entities.append(NLSmartEnergyAdvisorSensor(coordinator, entry))
+    daily = getattr(coordinator, "daily_forecast", None)
+    if daily is not None:
+        from .daily_sensor import daily_forecast_entities
+
+        entities.extend(daily_forecast_entities(daily, entry))
     _LOGGER.info("Adding %s EnerPrice sensor entities", len(entities))
     async_add_entities(entities)
 

@@ -29,6 +29,11 @@ from .const import (
     CONF_CUSTOM_SELL_FEE_ELECTRICITY,
     CONF_CUSTOM_SELL_FEE_INCLUDES_VAT,
     CONF_CUSTOM_SUPPLIER_NAME,
+    CONF_DAILY_ADVISOR_ENABLED,
+    CONF_DAILY_CONSUMPTION_ENTITIES,
+    CONF_DAILY_FORECAST_ENTITIES,
+    CONF_DAILY_GRID_POWER_ENTITY,
+    CONF_DAILY_SOLAR_ENERGY_ENTITY,
     CONF_ELECTRIC_EFFICIENCY,
     CONF_ENABLE_ENTSOE,
     CONF_ENERGY_TAX,
@@ -191,9 +196,7 @@ class NLDayAheadPricesOptionsFlow(config_entries.OptionsFlow):
             if not enabled:
                 # Disabling Smart Setup must not erase the user's device selections,
                 # efficiencies or language. This makes the toggle reversible.
-                return self.async_create_entry(
-                    title="", data=_disabled_smart_setup_options(data, user_input)
-                )
+                return await self._async_finish_smart_setup(_disabled_smart_setup_options(data, user_input))
             errors = _validate_smart_setup(user_input)
             if errors:
                 return self.async_show_form(
@@ -201,9 +204,41 @@ class NLDayAheadPricesOptionsFlow(config_entries.OptionsFlow):
                     data_schema=self._smart_setup_schema({**data, **user_input}),
                     errors=errors,
                 )
-            return self.async_create_entry(title="", data={**data, **user_input})
+            return await self._async_finish_smart_setup({**data, **user_input})
 
         return self.async_show_form(step_id="smart_setup", data_schema=self._smart_setup_schema(data))
+
+    async def _async_finish_smart_setup(self, data):
+        self._pending_options = data
+        if data.get(CONF_DAILY_ADVISOR_ENABLED, False):
+            return await self.async_step_daily_advisor()
+        return self.async_create_entry(title="", data=data)
+
+    async def async_step_daily_advisor(self, user_input=None):
+        """Configure the opt-in forecast foundation independently of Smart Setup."""
+        from .daily_advisor import validate_daily_inputs
+
+        data = self._pending_options or self._current_options()
+        errors = {}
+        if user_input is not None:
+            candidate = {**data, **user_input}
+            # Empty selections explicitly clear inputs; omitted fields preserve them.
+            errors = validate_daily_inputs(self.hass, candidate)
+            if not errors:
+                return self.async_create_entry(title="", data=candidate)
+            data = candidate
+        schema = {
+            vol.Optional(CONF_DAILY_FORECAST_ENTITIES, default=data.get(CONF_DAILY_FORECAST_ENTITIES, [])):
+                EntitySelector(EntitySelectorConfig(domain="sensor", integration="forecast_solar", device_class="energy", multiple=True)),
+            vol.Optional(CONF_DAILY_CONSUMPTION_ENTITIES, default=data.get(CONF_DAILY_CONSUMPTION_ENTITIES, [])):
+                EntitySelector(EntitySelectorConfig(domain="sensor", device_class="energy", multiple=True)),
+        }
+        # Lists of at most one entity allow explicit clearing with an empty list.
+        for key, device_class in ((CONF_DAILY_GRID_POWER_ENTITY, "power"), (CONF_DAILY_SOLAR_ENERGY_ENTITY, "energy")):
+            schema[vol.Optional(key, default=data.get(key, []))] = EntitySelector(
+                EntitySelectorConfig(domain="sensor", device_class=device_class, multiple=True)
+            )
+        return self.async_show_form(step_id="daily_advisor", data_schema=vol.Schema(schema), errors=errors)
 
     def _smart_setup_schema(self, data: dict[str, Any]) -> vol.Schema:
         """Return optional Smart Energy setup schema."""
@@ -300,6 +335,7 @@ class NLDayAheadPricesOptionsFlow(config_entries.OptionsFlow):
         schema = vol.Schema(
             {
                 vol.Optional(CONF_COUNTRY, default=data.get(CONF_COUNTRY, DEFAULT_COUNTRY)): str,
+                vol.Optional(CONF_DAILY_ADVISOR_ENABLED, default=data.get(CONF_DAILY_ADVISOR_ENABLED, False)): bool,
                 vol.Optional(CONF_CURRENCY, default=data.get(CONF_CURRENCY, DEFAULT_CURRENCY)): str,
                 vol.Optional(CONF_PRIMARY_PROVIDER, default=data.get(CONF_PRIMARY_PROVIDER, DEFAULT_PRIMARY_PROVIDER)): vol.In(
                     [PROVIDER_NORD_POOL, PROVIDER_ENERGY_CHARTS]

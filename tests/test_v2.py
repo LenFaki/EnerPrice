@@ -365,6 +365,7 @@ def test_english_and_dutch_ui_translations_have_equal_coverage() -> None:
 
     assert keys(english) == keys(dutch)
     assert set(dutch["services"]) == {
+        "get_daily_forecast",
         "export_chart_data",
         "generate_apexcharts_config",
         "find_best_charging_window",

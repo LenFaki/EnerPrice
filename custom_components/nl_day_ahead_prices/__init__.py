@@ -6,10 +6,12 @@ import logging
 from typing import TYPE_CHECKING
 
 from .const import (
+    CONF_DAILY_ADVISOR_ENABLED,
     CONF_GAS_PRICE_ENTITY,
     CONF_GRID_POWER_ENTITY,
     CONF_SMART_SETUP_ENABLED,
     CONF_SOLAR_POWER_ENTITY,
+    DAILY_INPUT_KEYS,
     DOMAIN,
     MARKET_PROVIDER_DEFAULTS,
     RUNTIME_DEFAULTS,
@@ -46,8 +48,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = NLDayAheadPricesCoordinator(hass, entry)
     coordinator.registry_manager = registry_manager
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    coordinator.daily_forecast = None
+    if {**entry.data, **entry.options}.get(CONF_DAILY_ADVISOR_ENABLED, False):
+        from .daily_advisor import DailyForecastCoordinator
+
+        coordinator.daily_forecast = DailyForecastCoordinator(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, _platforms())
     await coordinator.async_start()
+    if coordinator.daily_forecast is not None:
+        await coordinator.daily_forecast.async_start()
+        entry.async_create_background_task(
+            hass, coordinator.daily_forecast.async_refresh(), "EnerPrice local solar forecast"
+        )
     entry.async_on_unload(async_subscribe(
         hass, registry_manager, coordinator.registry_updated,
         enabled=supplier_update_mode({**entry.data, **entry.options}) == SUPPLIER_UPDATES_AUTOMATIC,
@@ -63,6 +75,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _LOGGER.info("Unloading EnerPrice config entry %s", entry.entry_id)
     unload_ok = await hass.config_entries.async_unload_platforms(entry, _platforms())
     if unload_ok:
+        daily = getattr(hass.data[DOMAIN][entry.entry_id], "daily_forecast", None)
+        if daily is not None:
+            await daily.async_stop()
         await hass.data[DOMAIN][entry.entry_id].async_stop()
         hass.data[DOMAIN].pop(entry.entry_id)
         # Integration-level services remain registered independently of config entries.
@@ -104,6 +119,8 @@ def _requires_reload(previous: dict, current: dict) -> bool:
     ):
         return True
     smart_listener_keys = (
+        CONF_DAILY_ADVISOR_ENABLED,
+        *DAILY_INPUT_KEYS,
         CONF_SMART_SETUP_ENABLED,
         CONF_GRID_POWER_ENTITY,
         CONF_SOLAR_POWER_ENTITY,
