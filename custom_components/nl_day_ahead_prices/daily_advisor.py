@@ -17,8 +17,10 @@ from .const import (
     CONF_ADVICE_LANGUAGE,
     CONF_DAILY_CONSUMPTION_ENTITIES,
     CONF_DAILY_DURATION_MINUTES,
+    CONF_DAILY_EXPORT_ENERGY_ENTITY,
     CONF_DAILY_FORECAST_ENTITIES,
     CONF_DAILY_GRID_POWER_ENTITY,
+    CONF_DAILY_IMPORT_ENERGY_ENTITY,
     CONF_DAILY_SOLAR_ENERGY_ENTITY,
     CONF_DAILY_SOLAR_POWER_ENTITY,
     CONF_FLEXIBLE_LOAD_POWER_W,
@@ -92,6 +94,8 @@ def selected_entities(options):
         *options.get(CONF_DAILY_GRID_POWER_ENTITY, [])[:1],
         *options.get(CONF_DAILY_SOLAR_ENERGY_ENTITY, [])[:1],
         *options.get(CONF_DAILY_SOLAR_POWER_ENTITY, [])[:1],
+        *options.get(CONF_DAILY_IMPORT_ENERGY_ENTITY, [])[:1],
+        *options.get(CONF_DAILY_EXPORT_ENERGY_ENTITY, [])[:1],
     ]))
 
 
@@ -126,9 +130,12 @@ def validate_daily_inputs(hass, options):
         (CONF_DAILY_SOLAR_ENERGY_ENTITY, options.get(CONF_DAILY_SOLAR_ENERGY_ENTITY, []), "energy", ENERGY_UNITS),
         (CONF_DAILY_SOLAR_POWER_ENTITY, options.get(CONF_DAILY_SOLAR_POWER_ENTITY, []), "power", POWER_UNITS),
         (CONF_DAILY_CONSUMPTION_ENTITIES, consumption, "energy", ENERGY_UNITS),
+        (CONF_DAILY_IMPORT_ENERGY_ENTITY, options.get(CONF_DAILY_IMPORT_ENERGY_ENTITY, []), "energy", ENERGY_UNITS),
+        (CONF_DAILY_EXPORT_ENERGY_ENTITY, options.get(CONF_DAILY_EXPORT_ENERGY_ENTITY, []), "energy", ENERGY_UNITS),
     ]
     for field, ids, device_class, units in groups:
-        if field in (CONF_DAILY_GRID_POWER_ENTITY, CONF_DAILY_SOLAR_ENERGY_ENTITY, CONF_DAILY_SOLAR_POWER_ENTITY) and len(ids) > 1:
+        if field in (CONF_DAILY_GRID_POWER_ENTITY, CONF_DAILY_SOLAR_ENERGY_ENTITY, CONF_DAILY_SOLAR_POWER_ENTITY,
+                     CONF_DAILY_IMPORT_ENERGY_ENTITY, CONF_DAILY_EXPORT_ENERGY_ENTITY) and len(ids) > 1:
             errors[field] = "daily_single_entity"
         for entity_id in ids:
             if not entity_id:
@@ -137,6 +144,8 @@ def validate_daily_inputs(hass, options):
             # Temporarily unavailable values are acceptable; metadata still must match.
             if state is None or state.attributes.get("device_class") != device_class or state.attributes.get("unit_of_measurement") not in units:
                 errors[field] = "daily_invalid_unit"
+            elif field in (CONF_DAILY_IMPORT_ENERGY_ENTITY, CONF_DAILY_EXPORT_ENERGY_ENTITY) and state.attributes.get("state_class") != "total_increasing":
+                errors[field] = "daily_invalid_counter"
     return errors
 
 
@@ -182,20 +191,25 @@ class DailyForecastCoordinator(DataUpdateCoordinator):
             ("solar_energy", self.options.get(CONF_DAILY_SOLAR_ENERGY_ENTITY, [])[:1], "energy", ENERGY_UNITS, "kWh"),
             ("solar_power", self.options.get(CONF_DAILY_SOLAR_POWER_ENTITY, [])[:1], "power", POWER_UNITS, "W"),
             ("consumption_energy", self.options.get(CONF_DAILY_CONSUMPTION_ENTITIES, [])[:MAX_INSTALLATIONS], "energy", ENERGY_UNITS, "kWh"),
+            ("import_energy", self.options.get(CONF_DAILY_IMPORT_ENERGY_ENTITY, [])[:1], "energy", ENERGY_UNITS, "kWh"),
+            ("export_energy", self.options.get(CONF_DAILY_EXPORT_ENERGY_ENTITY, [])[:1], "energy", ENERGY_UNITS, "kWh"),
         ]
         for role, entity_ids, device_class, units, unit in groups:
             for entity_id in dict.fromkeys(entity_ids):
                 if not entity_id:
                     continue
                 state = states.get(entity_id)
-                reason = state_quality(state, now, MAX_MEASUREMENT_AGE)
+                counter = role in ("solar_energy", "import_energy", "export_energy")
+                reason = state_quality(state, now, MAX_MEASUREMENT_AGE, reported=counter)
                 value = numeric_state(state, device_class, units) if reason is None else None
+                observed = getattr(state, "last_reported", state.last_updated) if state and counter else state.last_updated if state else None
                 result["measurements"].append({
                     "entity_id": entity_id, "role": role, "value": value, "unit": unit,
                     "kind": "measured" if value is not None else "unknown",
                     "status": reason or ("available" if value is not None else "invalid_value"),
                     "state_class": state.attributes.get("state_class") if state else None,
                     "last_updated": state.last_updated.isoformat() if state and state.last_updated.tzinfo else None,
+                    "observed_at": observed.isoformat() if observed and observed.tzinfo else None,
                 })
         # Series are response-only and never copied to sensor attributes.
         fresh = (self._series_read_at is not None

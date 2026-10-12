@@ -10,34 +10,20 @@
 - A `null` JSON body from a price provider is now retried and reported as an empty response instead of failing later during parsing.
 - The `cheapest_*` block attributes and the new sell-price arrays are excluded from Recorder history, like the other large price arrays.
 
-## Unreleased - v2.6 Daily Energy Advisor, PR2
+## 2.6.0 - 2026-10-12
 
 ### Added
-- Extend the existing Smart Energy Advisor with daily consumption windows using the shared interval optimizer and all-in tariff calculations.
-- Add explicit, low-confidence solar alternatives using forecast production, fresh simultaneous grid/solar measurements and interval-date export fees.
-- Add Daily Energy Advice and Best Consumption Window entities, three calendar days of price/forecast availability, and hypothetical financial comparisons with named reference scenarios.
-- Add optional daily duration and actual solar-power inputs; preserve all stored PR1 and Smart Setup settings.
-- Add `include_daily_advisor` and `use_apexcharts` dashboard flags, actual entity-registry resolution, NL/EN advice and built-in-card fallback.
+- Optional Daily Energy Advisor with Forecast.Solar today/tomorrow totals, explicit data-quality states and three-day outlook; unavailable future totals/prices remain unknown.
+- Grid-only best consumption windows and separately labelled conditional solar scenarios using existing all-in prices and export opportunity costs.
+- Opt-in daily dashboard cards, Daily Energy Advice and Best Consumption Window entities, with NL/EN labels and built-in-card fallback.
+- Explicitly consented Home Assistant morning briefings with selectable notification target, local delivery time and durable at-most-once attempts across restarts and DST.
+- Conservative forecast-versus-actual energy performance checks using cumulative meters, with bounded local history and dedicated status entities.
 
-### Compatibility
-- Existing dashboard output is unchanged when new flags are omitted. Existing Smart Energy response fields remain unchanged when Daily Advisor is disabled.
-- Missing prices, missing forecast intervals and unknown household demand are not invented or treated as free electricity.
-- No automatic control, notifications, persistent savings history, tariff updates or realized-savings claims. These remain outside PR2.
-- Version remains 2.5.4; no release or configuration migration.
-
-## Unreleased - v2.6 Daily Energy Advisor, PR1
-
-### Added
-- Opt-in Daily Advisor forecast configuration, independent of Smart Setup and disabled by default.
-- Local Forecast.Solar daily totals, conservative freshness checks and installation/day deduplication.
-- Solar Forecast Today, Solar Forecast Tomorrow and Forecast Data Quality sensors with Dutch/English translations.
-- Bounded `get_daily_forecast` response data, using Home Assistant's cached Forecast.Solar service when available.
-- Three Amsterdam calendar dates with unknown totals explicitly retained; no synthetic hourly forecasts or solar-surplus estimates.
-
-### Scope
-- This first PR covers configuration and forecast inputs only. Daily recommendations/dashboard additions and notifications/savings verification follow in separate PRs.
-- Existing pricing, supplier data, services, entity IDs, Smart Energy advice and dashboards remain unchanged.
-- Integration/project version remains 2.5.4; no release is published by this development change.
+### Compatibility and limitations
+- Existing installations retain settings, entity IDs, price calculations, services and default dashboards; Daily Advisor remains optional.
+- No automatic device control, email, additional paid API or unsupported claim of realized financial savings.
+- Missing, stale, reset or incomplete readings never count as zero or verified performance; live Home Assistant smoke testing is recommended before publishing.
+- See docs/daily-advisor.md, docs/daily-advisor-pr2.md and docs/daily-advisor-pr3.md for configuration and rollback guidance.
 
 ## 2.5.4 - 2026-10-01
 

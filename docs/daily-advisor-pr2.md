@@ -1,5 +1,9 @@
 # Daily Energy Advisor PR2
 
+This document describes PR2. See [PR3](daily-advisor-pr3.md) for consent-gated
+notifications and conservative historical energy checks; its scope supersedes
+the PR2 exclusions below.
+
 PR2 extends the **existing** `build_smart_energy_advice` entry point. It uses the
 shared `optimize_intervals` optimizer, `all_in_entries_for_supplier` and existing
 supplier export-fee calculations. It is not a separate competing pricing engine.

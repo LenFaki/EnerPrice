@@ -303,7 +303,7 @@ def test_translations_and_version():
         assert set(content["entity"]["sensor"]["supplier_registry_status"]["state"]) == {
             "remote", "cached_remote", "bundled",
         }
-    assert json.loads((base / "manifest.json").read_text())["version"] == "2.5.4"
+    assert json.loads((base / "manifest.json").read_text())["version"] == "2.6.0"
     for path in (base / "strings.json", base / "translations/en.json", base / "translations/nl.json"):
         content = json.loads(path.read_text())
         assert "smart_setup" in content["options"]["step"]
@@ -412,6 +412,7 @@ async def test_options_flow_selector_defaults_and_cache_preview(monkeypatch, mod
                 "NumberSelectorMode": SimpleNamespace(BOX="box"),
                 "SelectSelector": lambda data: data,
                 "SelectSelectorConfig": dict,
+                "TimeSelector": lambda: {"time": {}},
             },
     }
     for name, attrs in modules.items():
@@ -470,6 +471,7 @@ def _load_config_flow_for_test(monkeypatch):
             "NumberSelectorMode": SimpleNamespace(BOX="box"),
             "SelectSelector": lambda data: data,
             "SelectSelectorConfig": dict,
+            "TimeSelector": lambda: {"time": {}},
         },
     }
     for name, attrs in modules.items():

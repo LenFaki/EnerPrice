@@ -49,16 +49,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator.registry_manager = registry_manager
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     coordinator.daily_forecast = None
+    coordinator.daily_delivery = None
     if {**entry.data, **entry.options}.get(CONF_DAILY_ADVISOR_ENABLED, False):
         from .daily_advisor import DailyForecastCoordinator
 
         coordinator.daily_forecast = DailyForecastCoordinator(hass, entry)
+        from .daily_delivery import DailyAdvisorDelivery
+
+        coordinator.daily_delivery = DailyAdvisorDelivery(coordinator)
     await hass.config_entries.async_forward_entry_setups(entry, _platforms())
     await coordinator.async_start()
     if coordinator.daily_forecast is not None:
         await coordinator.daily_forecast.async_start()
         entry.async_create_background_task(
             hass, coordinator.daily_forecast.async_refresh(), "EnerPrice local solar forecast"
+        )
+        coordinator.daily_delivery.start_task = entry.async_create_background_task(
+            hass, coordinator.daily_delivery.async_start(), "EnerPrice Daily Advisor history"
         )
     entry.async_on_unload(async_subscribe(
         hass, registry_manager, coordinator.registry_updated,
@@ -75,6 +82,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _LOGGER.info("Unloading EnerPrice config entry %s", entry.entry_id)
     unload_ok = await hass.config_entries.async_unload_platforms(entry, _platforms())
     if unload_ok:
+        delivery = getattr(hass.data[DOMAIN][entry.entry_id], "daily_delivery", None)
+        if delivery is not None:
+            await delivery.async_stop()
         daily = getattr(hass.data[DOMAIN][entry.entry_id], "daily_forecast", None)
         if daily is not None:
             await daily.async_stop()

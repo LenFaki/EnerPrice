@@ -269,6 +269,8 @@ def _daily_cards(ids, language, use_apexcharts):
         ("solar_forecast_tomorrow", "Zonneprognose morgen" if nl else "Solar forecast tomorrow"),
         ("best_consumption_window", "Beste gebruiksvenster" if nl else "Best consumption window"),
         ("daily_forecast_quality", "Datakwaliteit" if nl else "Data quality"),
+        ("daily_notification_status", "Notificatiestatus" if nl else "Notification status"),
+        ("daily_energy_performance", "Energiecontrole" if nl else "Energy performance"),
     ):
         if ids.get(key):
             tiles += f"""          - type: tile
@@ -310,6 +312,22 @@ def _daily_cards(ids, language, use_apexcharts):
 
               {"Zonneproductie is geen beschikbaar overschot. Dit is geen aangetoonde besparing." if nl else "Solar production is not available surplus. This is not demonstrated savings."}
               {{{{ state_attr('{advisor}', 'heat_cost_note') | default('', true) }}}}
+"""
+    performance = ids.get("daily_energy_performance")
+    if performance:
+        metric_labels = "{'solar_energy':'Zonneopwek','import_energy':'Netafname','export_energy':'Teruglevering'}" if nl else "{'solar_energy':'Solar production','import_energy':'Grid import','export_energy':'Grid export'}"
+        cards += f"""          - type: markdown
+            title: {"Voorspeld en werkelijk" if nl else "Predicted and actual"}
+            content: |-
+              {{{{ state_attr('{performance}', 'date') or '{unknown}' }}}}
+              | {"Energie | Voorspeld (kWh) | Werkelijk (kWh) | Verschil (kWh)" if nl else "Energy | Predicted (kWh) | Actual (kWh) | Error (kWh)"} |
+              | --- | --- | --- | --- |
+              {{% for key, item in (state_attr('{performance}', 'metrics') or {{}}).items() %}}
+              | {{{{ {metric_labels}.get(key, key) }}}} | {{{{ item.predicted_kwh if item.predicted_kwh is not none else '{unknown}' }}}} | {{{{ item.actual_kwh if item.actual_kwh is not none else '{unknown}' }}}} | {{{{ item.error_kwh if item.error_kwh is not none else '{unknown}' }}}} |
+              {{% endfor %}}
+              {"Potentieel verschil (EUR)" if nl else "Potential difference (EUR)"}: {{{{ state_attr('{performance}', 'potential_savings_eur') if state_attr('{performance}', 'potential_savings_eur') is not none else '{unknown}' }}}}.
+              {"Aangetoonde besparing: onbekend. Geen geverifieerde referentie of bewijs van apparaatuitvoering." if nl else "Demonstrated savings: unknown. No verified counterfactual or proof of appliance execution."}
+              {"Netprognose is een scenario met gelijkblijvend verbruik. Ontbrekende of verouderde metingen blijven onbekend." if nl else "Grid prediction assumes constant household demand. Missing or stale measurements remain unknown."}
 """
     if use_apexcharts:
         cards += f"""          - type: custom:apexcharts-card
