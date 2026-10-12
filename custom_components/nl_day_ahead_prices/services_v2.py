@@ -125,6 +125,8 @@ SERVICE_SCHEMAS = {
             vol.Optional("include_ev_planner", default=False): cv.boolean,
             vol.Optional("include_battery_strategy", default=False): cv.boolean,
             vol.Optional("include_smart_energy", default=True): cv.boolean,
+            vol.Optional("include_daily_advisor", default=False): cv.boolean,
+            vol.Optional("use_apexcharts", default=True): cv.boolean,
             vol.Optional("theme", default="auto"): vol.In(["auto", "light", "dark"]),
             vol.Optional("language", default="auto"): vol.In(["auto", "en", "nl"]),
         }
@@ -181,6 +183,10 @@ def async_register_v2_services(hass: HomeAssistant) -> None:
             return {"yaml": generate_automation_yaml(**data)}
         coordinator = _coordinator(hass, data.pop("config_entry_id", None))
         if coordinator is None or coordinator.data is None:
+            if coordinator is not None and name == "get_smart_energy_advice" and getattr(coordinator, "daily_forecast", None) is not None:
+                from .daily_advisor import daily_advice
+
+                return {"state": "normal", "daily_advisor": daily_advice(coordinator, data.get("language"))}
             return {"error": "Price data is not available"}
         if name == "get_smart_energy_advice":
             prices = _prices(coordinator, "all_in", True)
@@ -202,6 +208,11 @@ def async_register_v2_services(hass: HomeAssistant) -> None:
                 stored.pop(key, None)
             for key, value in stored.items():
                 data.setdefault(key, value)
+            context = None
+            if getattr(coordinator, "daily_forecast", None) is not None:
+                from .daily_advisor import advisor_context
+
+                context = advisor_context(coordinator)
             result = build_smart_energy_advice(
                 electricity_price=current_price(prices, now),
                 future_prices=prices,
@@ -209,6 +220,7 @@ def async_register_v2_services(hass: HomeAssistant) -> None:
                 gas_price_per_m3=gas_price,
                 solar_power_w=solar_power,
                 grid_power_w=grid_power,
+                daily_context=context,
                 **data,
             )
             return _serialize(result)
@@ -281,6 +293,11 @@ def _dashboard_entity_ids(hass: HomeAssistant, config_entry_id: str) -> dict[str
             "selected_supplier",
             "current_provider",
             "smart_energy_advisor",
+            "solar_forecast_today",
+            "solar_forecast_tomorrow",
+            "daily_forecast_quality",
+            "daily_energy_advice",
+            "best_consumption_window",
         ):
             if entity.unique_id.endswith(f"_{key}"):
                 by_unique_suffix[key] = entity.entity_id

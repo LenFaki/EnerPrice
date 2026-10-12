@@ -1,10 +1,61 @@
 """Bounded forecast summaries, separate from price and savings semantics."""
 
+from datetime import datetime
+
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.const import EntityCategory, UnitOfEnergy
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
+
+
+def daily_advice_entities(coordinator, entry):
+    return [DailyAdviceSensor(coordinator, entry, key) for key in ("daily_energy_advice", "best_consumption_window")]
+
+
+class DailyAdviceSensor(CoordinatorEntity, SensorEntity):
+    """Existing advisor output, refreshed by both prices and forecast measurements."""
+
+    _attr_has_entity_name = True
+    _unrecorded_attributes = frozenset({"chart"})
+
+    def __init__(self, coordinator, entry, key):
+        super().__init__(coordinator)
+        self.key = key
+        self._attr_unique_id = f"{entry.entry_id}_{key}"
+        self._attr_translation_key = key
+        self._attr_device_info = {"identifiers": {(DOMAIN, entry.entry_id)}, "name": "EnerPrice", "manufacturer": "EnerPrice"}
+        self._attr_device_class = SensorDeviceClass.TIMESTAMP if key == "best_consumption_window" else SensorDeviceClass.ENUM
+        if key == "daily_energy_advice":
+            self._attr_options = ["ready", "unavailable"]
+
+    async def async_added_to_hass(self):
+        await super().async_added_to_hass()
+        self.async_on_remove(self.coordinator.daily_forecast.async_add_listener(self.async_write_ha_state))
+
+    def _advice(self):
+        from .daily_advisor import daily_advice
+
+        return daily_advice(self.coordinator)
+
+    @property
+    def available(self):
+        return self.key == "daily_energy_advice" or self.native_value is not None
+
+    @property
+    def native_value(self):
+        result = self._advice()
+        if self.key == "daily_energy_advice":
+            return result["state"]
+        best = result["best_window"]
+        return datetime.fromisoformat(best["start"]) if best else None
+
+    @property
+    def extra_state_attributes(self):
+        result = self._advice()
+        if self.key == "best_consumption_window":
+            return result["best_window"] or {}
+        return {key: value for key, value in result.items() if key != "state"}
 
 
 def daily_forecast_entities(coordinator, entry):

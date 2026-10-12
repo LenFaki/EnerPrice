@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased - v2.6 Daily Energy Advisor, PR2
+
+### Added
+- Extend the existing Smart Energy Advisor with daily consumption windows using the shared interval optimizer and all-in tariff calculations.
+- Add explicit, low-confidence solar alternatives using forecast production, fresh simultaneous grid/solar measurements and interval-date export fees.
+- Add Daily Energy Advice and Best Consumption Window entities, three calendar days of price/forecast availability, and hypothetical financial comparisons with named reference scenarios.
+- Add optional daily duration and actual solar-power inputs; preserve all stored PR1 and Smart Setup settings.
+- Add `include_daily_advisor` and `use_apexcharts` dashboard flags, actual entity-registry resolution, NL/EN advice and built-in-card fallback.
+
+### Compatibility
+- Existing dashboard output is unchanged when new flags are omitted. Existing Smart Energy response fields remain unchanged when Daily Advisor is disabled.
+- Missing prices, missing forecast intervals and unknown household demand are not invented or treated as free electricity.
+- No automatic control, notifications, persistent savings history, tariff updates or realized-savings claims. These remain outside PR2.
+- Version remains 2.5.4; no release or configuration migration.
+
 ## Unreleased - v2.6 Daily Energy Advisor, PR1
 
 ### Added

@@ -722,9 +722,10 @@ async def async_setup_entry(
         entities.append(NLSmartEnergyAdvisorSensor(coordinator, entry))
     daily = getattr(coordinator, "daily_forecast", None)
     if daily is not None:
-        from .daily_sensor import daily_forecast_entities
+        from .daily_sensor import daily_advice_entities, daily_forecast_entities
 
         entities.extend(daily_forecast_entities(daily, entry))
+        entities.extend(daily_advice_entities(coordinator, entry))
     _LOGGER.info("Adding %s EnerPrice sensor entities", len(entities))
     async_add_entities(entities)
 
@@ -735,6 +736,7 @@ class NLSmartEnergyAdvisorSensor(CoordinatorEntity[NLDayAheadPricesCoordinator],
     _attr_has_entity_name = True
     _attr_name = "Smart Energy Advisor"
     _attr_icon = "mdi:home-lightning-bolt"
+    _unrecorded_attributes = frozenset({"daily_advisor"})
 
     def __init__(self, coordinator: NLDayAheadPricesCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator)
@@ -762,6 +764,9 @@ class NLSmartEnergyAdvisorSensor(CoordinatorEntity[NLDayAheadPricesCoordinator],
         entity_ids = [entity_id for entity_id in watched if entity_id]
         if entity_ids:
             self.async_on_remove(async_track_state_change_event(self.hass, entity_ids, self._async_input_changed))
+        daily = getattr(self.coordinator, "daily_forecast", None)
+        if daily is not None:
+            self.async_on_remove(daily.async_add_listener(self.async_write_ha_state))
 
     def _async_input_changed(self, event: Any) -> None:
         """Refresh advice on the Home Assistant event loop."""
@@ -777,6 +782,11 @@ class NLSmartEnergyAdvisorSensor(CoordinatorEntity[NLDayAheadPricesCoordinator],
         language = str(options.get(CONF_ADVICE_LANGUAGE, DEFAULT_ADVICE_LANGUAGE))
         if language == "auto":
             language = self.hass.config.language
+        context = None
+        if getattr(self.coordinator, "daily_forecast", None) is not None:
+            from .daily_advisor import advisor_context
+
+            context = advisor_context(self.coordinator)
         return build_smart_energy_advice(
             electricity_price=current_price(all_in, now),
             future_prices=all_in,
@@ -790,6 +800,7 @@ class NLSmartEnergyAdvisorSensor(CoordinatorEntity[NLDayAheadPricesCoordinator],
             gas_kwh_per_m3=float(options.get(CONF_GAS_KWH_PER_M3, DEFAULT_GAS_KWH_PER_M3)),
             solar_surplus_threshold_w=float(options.get(CONF_SOLAR_SURPLUS_THRESHOLD_W, DEFAULT_SOLAR_SURPLUS_THRESHOLD_W)),
             language=language,
+            daily_context=context,
         )
 
     @property

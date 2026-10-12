@@ -27,7 +27,7 @@
           "enable_entsoe": "Enable optional ENTSO-E fallback",
           "entsoe_api_token": "ENTSO-E API token",
           "selected_supplier": "Supplier",
-          "daily_advisor_enabled": "Enable Daily Advisor forecasts (preview)",
+          "daily_advisor_enabled": "Enable Daily Advisor (preview)",
           "supplier_tariff_updates": "Supplier tariff updates",
           "price_resolution": "Price interval",
           "energy_tax": "Energy tax per kWh",
@@ -38,8 +38,10 @@
       },
       "daily_advisor": {
         "title": "Daily Advisor: solar forecasts",
-        "description": "PR1: forecasts and data quality, not yet daily recommendations or notifications. For each Forecast.Solar installation select only today's and tomorrow's total energy, not remaining energy or hourly values. Select each physical installation once. Empty selections are allowed.",
+        "description": "Daily consumption windows and solar forecasts, without device control or notifications. Uses appliance power from Smart Setup and the duration configured here. Select only today's and tomorrow's Forecast.Solar daily totals. Optional fresh grid and solar power measurements enable a conditional solar scenario; production is not surplus.",
         "data": {
+          "daily_solar_power_entity": "Actual solar power (at most one sensor, W/kW)",
+          "daily_duration_minutes": "Flexible appliance duration",
           "daily_forecast_entities": "Forecast.Solar daily totals",
           "daily_grid_power_entity": "Grid power (at most one sensor, W/kW)",
           "daily_solar_energy_entity": "Actual solar energy (at most one sensor, Wh/kWh)",
@@ -94,6 +96,7 @@
       }
     },
     "error": {
+      "daily_invalid_duration": "Choose 15 to 1440 minutes, in steps of 15 minutes.",
       "daily_invalid_forecast": "Select only today's or tomorrow's total energy from Forecast.Solar.",
       "daily_duplicate_forecast": "The same installation and day were selected more than once.",
       "daily_invalid_unit": "Sensor missing or incorrect device class or unit.",
@@ -337,6 +340,8 @@
       "name": "Generate EnerPrice dashboard",
       "description": "Generate Lovelace YAML to paste manually into a dashboard.",
       "fields": {
+        "include_daily_advisor": {"name": "Show Daily Advisor", "description": "Optional consumption windows, solar forecasts and three-day outlook."},
+        "use_apexcharts": {"name": "Use ApexCharts", "description": "Disable for a dashboard using only built-in cards."},
         "dashboard_type": {
           "name": "Dashboard type",
           "description": "Choose a compact, full, or advisor dashboard."
@@ -404,6 +409,8 @@
   },
   "entity": {
     "sensor": {
+      "daily_energy_advice": {"name": "Daily Energy Advice", "state": {"ready": "Advice available", "unavailable": "Insufficient data"}},
+      "best_consumption_window": {"name": "Best Consumption Window"},
       "solar_forecast_today": {"name":"Solar Forecast Today"},
       "solar_forecast_tomorrow": {"name":"Solar Forecast Tomorrow"},
       "daily_forecast_quality": {"name":"Forecast Data Quality","state":{"partial":"Partially available","unavailable":"Unavailable"}},
