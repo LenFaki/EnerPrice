@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — planned 2.6.2
+## 2.6.2 - 2026-10-13
 
 ### Fixed
 - Daily solar scenarios now accept P1 and solar-power snapshots taken up to five minutes apart **only when both readings are no more than five minutes old**. This reduces false `power_measurements_not_synchronized` results from sensors with different update frequencies; old readings still fail closed.

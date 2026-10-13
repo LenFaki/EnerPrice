@@ -69,6 +69,8 @@ def runner(monkeypatch, version="2.1.0", previous="2.0.3", failure=None):
         if args[:2] == ("git", "rev-parse"):
             return "a" * 40
         if args[:2] == ("git", "show"):
+            if ":docs/releases/" in args[2]:
+                raise subprocess.CalledProcessError(128, args)
             return json.dumps({"version": previous if args[2].startswith("b" * 40) else version})
         if args[:2] == ("gh", "api"):
             return json.dumps([[published("2.0.3")]])
@@ -121,3 +123,36 @@ def test_manual_bootstrap_and_missing_base():
     assert release.automatic_change_required("workflow_dispatch", "2.1.0", None)
     with pytest.raises(ValueError):
         release.automatic_change_required("push", "2.1.0", None)
+
+
+def test_curated_bilingual_release_notes(monkeypatch):
+    context(monkeypatch)
+    calls = runner(monkeypatch, version="2.6.2")
+    original = release.run
+
+    def with_notes(*args):
+        if args[:2] == ("git", "show") and ":docs/releases/v2.6.2.md" in args[2]:
+            return "# Release\n## English\nInstructions\n## Nederlands\nInstructies"
+        return original(*args)
+
+    monkeypatch.setattr(release, "run", with_notes)
+    release.execute(publish=True)
+    assert "--notes-file" in calls[-1]
+    assert calls[-1][calls[-1].index("--notes-file") + 1] == "docs/releases/v2.6.2.md"
+    assert "--generate-notes" not in calls[-1]
+
+
+def test_missing_dutch_notes_blocks_tag_creation(monkeypatch):
+    context(monkeypatch)
+    calls = runner(monkeypatch, version="2.6.2")
+    original = release.run
+
+    def with_bad_notes(*args):
+        if args[:2] == ("git", "show") and ":docs/releases/v2.6.2.md" in args[2]:
+            return "# Release\n## English\nNo Dutch section"
+        return original(*args)
+
+    monkeypatch.setattr(release, "run", with_bad_notes)
+    with pytest.raises(ValueError, match="English and Nederlands"):
+        release.execute(publish=True)
+    assert not any(call[:2] == ("git", "tag") for call in calls)

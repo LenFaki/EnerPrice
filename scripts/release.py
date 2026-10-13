@@ -125,11 +125,26 @@ def execute(*, publish: bool = False) -> None:
         if required:
             print("Dry-run: no tag or release created.")
         return
-    # No force flag: a competing/existing remote tag aborts rather than overwrites.
+    command = ["gh", "release", "create", tag, "--repo", REPOSITORY,
+               "--verify-tag", "--target", sha, "--title", f"EnerPrice {tag}"]
+    # Prefer maintainer-reviewed, bilingual release notes committed with the tested
+    # version. Read from the exact tested commit, not a moving working-tree file.
+    notes_path = f"docs/releases/{tag}.md"
+    try:
+        notes = run("git", "show", f"{sha}:{notes_path}")
+    except subprocess.CalledProcessError as error:
+        if error.returncode not in (128,):
+            raise
+        # Older versions have no curated release notes.
+        command.append("--generate-notes")
+    else:
+        if not notes.strip() or "## English" not in notes or "## Nederlands" not in notes:
+            raise ValueError(f"Release notes {notes_path} must include English and Nederlands sections")
+        command.extend(["--notes-file", notes_path])
+    # Do not create a tag until curated notes have passed validation.
+    # No force flag: a competing/existing remote tag aborts.
     run("git", "tag", tag, sha)
     run("git", "push", "origin", f"refs/tags/{tag}:refs/tags/{tag}")
-    command = ["gh", "release", "create", tag, "--repo", REPOSITORY,
-               "--verify-tag", "--target", sha, "--title", f"EnerPrice {tag}", "--generate-notes"]
     if version_key(version)[3]:
         command.append("--latest=true")
     else:
