@@ -305,7 +305,7 @@ async def test_options_flow_consent_binding_revocation_and_unrelated_values(runt
     flow.config_entry = SimpleNamespace(data={}, options=existing)
     form = await flow.async_step_daily_advisor()
     consent = next(key for key in form["data_schema"] if key.key == CONF_DAILY_NOTIFY_CONSENT)
-    assert consent.default is False
+    assert consent.default is existing[CONF_DAILY_NOTIFY_CONSENT]
     result = await flow.async_step_daily_advisor({CONF_DAILY_NOTIFY_CONSENT: True, CONF_DAILY_NOTIFY_TARGET: "notify.persistent_notification"})
     assert result["data"][DAILY_CONSENT_TARGET] == "notify.persistent_notification"
     assert result["data"]["smart_flexible_load_power_w"] == 2500
