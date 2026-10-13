@@ -234,10 +234,10 @@ class DailyForecastCoordinator(DataUpdateCoordinator):
 
     @callback
     def _input_changed(self, event):
-        # Immediate local-only updates. The scheduled refresh reads cached series.
-        if event.data.get("entity_id") in self.options.get(CONF_DAILY_FORECAST_ENTITIES, []):
-            self._series = []
-            self._series_status = "pending"
+        # Daily total sensors can update independently of the cached forecast service.
+        # Keep a validated series until its existing freshness checks expire;
+        # otherwise every ordinary sensor update removes solar advice for up to
+        # the next 30-minute scheduled refresh.
         self._clock_tick(None)
 
     async def async_stop(self):
