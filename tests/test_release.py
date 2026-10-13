@@ -132,7 +132,7 @@ def test_curated_bilingual_release_notes(monkeypatch):
 
     def with_notes(*args):
         if args[:2] == ("git", "show") and ":docs/releases/v2.6.2.md" in args[2]:
-            return "# Release\\n## English\\nInstructions\\n## Nederlands\\nInstructies"
+            return "# Release\n## English\nInstructions\n## Nederlands\nInstructies"
         return original(*args)
 
     monkeypatch.setattr(release, "run", with_notes)
@@ -149,7 +149,7 @@ def test_missing_dutch_notes_blocks_tag_creation(monkeypatch):
 
     def with_bad_notes(*args):
         if args[:2] == ("git", "show") and ":docs/releases/v2.6.2.md" in args[2]:
-            return "# Release\\n## English\\nNo Dutch section"
+            return "# Release\n## English\nNo Dutch section"
         return original(*args)
 
     monkeypatch.setattr(release, "run", with_bad_notes)
