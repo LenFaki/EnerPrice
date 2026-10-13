@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": 2,
-  "published_at": "2026-09-28T00:00:00Z",
+  "revision": 3,
+  "published_at": "2026-10-13T00:00:00Z",
   "country": "NL",
   "currency": "EUR",
   "suppliers": {
@@ -356,7 +356,7 @@
           "source_type": "official",
           "source_url": "https://pure-energie.nl/groene-stroom/tarieven",
           "last_verified": "2026-07-11",
-          "notes": "Export corrected on 2026-10-12 against a customer's live prices (market 0.18737, sell 0.17438 EUR/kWh): Pure Energie pays the market price excluding VAT minus a EUR 0.01299/kWh sell fee. https://pure-energie.nl/kennisbank/inkoop-en-verkoopvergoeding-dynamisch-contract/ confirms the mechanism, not exact current customer amounts. Check Mijn Pure Energie or your contract; complete-record last_verified not advanced.",
+          "notes": "Export corrected on 2026-10-12 against live prices: Pure Energie pays the market price excluding VAT minus a EUR 0.01299/kWh sell fee. https://pure-energie.nl/kennisbank/inkoop-en-verkoopvergoeding-dynamisch-contract/ confirms the mechanism, not exact current customer amounts. Check Mijn Pure Energie or your contract; complete-record last_verified not advanced.",
           "feed_in_fee": 0,
           "imbalance_fee": null,
           "profile_version": 2,
