@@ -26,7 +26,7 @@ De optionele **Dagelijkse Energieadviseur** zoekt het voordeligste moment voor e
 
 **Begin eenvoudig:** zet de Dagelijkse Energieadviseur aan, vul het apparaatvermogen en de duur in, en bekijk eerst het gewone prijsadvies. Voeg zon, meldingen en prestatiemeting pas toe wanneer je die wilt gebruiken.
 
-**[Lees de volledige handleiding voor EnerPrice 2.6: instellen, gebruiken en problemen oplossen](docs/enerprice-v2-6-gebruikershandleiding.md).**
+**[Lees de volledige Nederlandstalige handleiding voor EnerPrice 2.6](docs/enerprice-v2-6-gebruikershandleiding.md)** of de [English user guide](docs/enerprice-v2-6-user-guide.md).
 
 ## EnerPrice v2.5 — Smart Setup en Smart Energy Advisor
 
