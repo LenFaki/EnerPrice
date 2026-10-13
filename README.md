@@ -47,6 +47,14 @@ It is inspired by the sensor and ApexCharts attribute shape of `hass-entso-e`, b
 
 The default bidding zone is `NL`, currency is `EUR`, and all sensor prices are exposed as `EUR/kWh`. Provider prices in `EUR/MWh` are converted automatically.
 
+## EnerPrice 2.6 — Daily Energy Advisor
+
+The optional Daily Energy Advisor finds a cheapest fully priced period for a configured flexible load. Optional Forecast.Solar, P1 and solar-power inputs enable a **separate conditional solar scenario**, including the opportunity cost of foregone export. Opt-in morning briefings require explicit consent; optional cumulative energy counters support conservative forecast-versus-actual checks. No devices are switched automatically.
+
+**Start simple:** enable Daily Advisor, enter the appliance power and duration, and check the grid-only recommendation first. Add solar inputs, notifications and performance checks only when useful.
+
+See the [step-by-step EnerPrice 2.6 guide (Dutch)](docs/enerprice-v2-6-gebruikershandleiding.md) for configuration, interpretation and troubleshooting.
+
 ## EnerPrice v2.5 — Smart Setup and Smart Energy Advisor
 
 V2.5 adds optional **Smart Setup** to the existing Smart Energy Advisor. In the EnerPrice options you can store the grid/P1 entity, actual solar-production entity, gas-price entity, one flexible load and its power, efficiencies, gas energy content, surplus threshold and advice language. The advisor then uses these values automatically. Explicit service-call values always take precedence. Smart Setup remains disabled by default for existing installations, preserving v2.4.x behavior.

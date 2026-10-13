@@ -247,7 +247,9 @@ def _daily_advice(prices, now, context, power_w, language):
         solar_time = measurements["solar_power"].get("last_updated")
         if grid_time and solar_time:
             stamps = [datetime.fromisoformat(value).astimezone(timezone.utc) for value in (grid_time, solar_time)]
-            if abs((stamps[0] - stamps[1]).total_seconds()) <= 60 and all(0 <= (now - stamp).total_seconds() <= 900 for stamp in stamps):
+            # P1 and inverter sensors report at different rates. Both readings must
+            # remain fresh; a stale measurement must not become a live baseline.
+            if abs((stamps[0] - stamps[1]).total_seconds()) <= 300 and all(0 <= (now - stamp).total_seconds() <= 300 for stamp in stamps):
                 baseline = solar + grid
     # Explain why the conditional solar scenario cannot be calculated.
     solar_diagnostics = []

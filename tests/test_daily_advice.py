@@ -115,7 +115,7 @@ def test_incomplete_inputs_never_turn_production_into_free_energy(problem):
         for row in forecast["measurements"]:
             row["last_updated"] = (NOW-timedelta(minutes=20)).isoformat()
     elif problem == "not_simultaneous":
-        forecast["measurements"][0]["last_updated"] = (NOW-timedelta(minutes=2)).isoformat()
+        forecast["measurements"][0]["last_updated"] = (NOW-timedelta(minutes=6)).isoformat()
     elif problem == "partial_series":
         forecast["series_status"] = "partial"
     elif problem == "missing_export":
@@ -125,6 +125,29 @@ def test_incomplete_inputs_never_turn_production_into_free_energy(problem):
         forecast["installation_count"] = 2
     result = daily(prices, ctx)
     assert result["best_window"] is not None
+    assert all(item["model"] == "grid_only" for item in result["advice"])
+
+
+
+@pytest.mark.parametrize("lag_seconds", [0, 120, 299, 300])
+def test_fresh_asynchronous_power_snapshots_enable_conditional_solar(lag_seconds):
+    prices = prices_for_day()
+    ctx = context(prices)
+    ctx["forecast"]["measurements"][0]["last_updated"] = (NOW-timedelta(seconds=lag_seconds)).isoformat()
+    result = daily(prices, ctx)
+    assert result["solar_scenario_available"] is True
+    assert result["assumed_household_load_w"] == 500
+    assert any(item["model"] == "solar_scenario" for item in result["advice"])
+
+
+@pytest.mark.parametrize("lag_seconds", [301, 900, 1200])
+def test_old_power_snapshots_never_enable_conditional_solar(lag_seconds):
+    prices = prices_for_day()
+    ctx = context(prices)
+    ctx["forecast"]["measurements"][0]["last_updated"] = (NOW-timedelta(seconds=lag_seconds)).isoformat()
+    result = daily(prices, ctx)
+    assert result["solar_scenario_available"] is False
+    assert "power_measurements_not_synchronized" in result["solar_diagnostics"]
     assert all(item["model"] == "grid_only" for item in result["advice"])
 
 
