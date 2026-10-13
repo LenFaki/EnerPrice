@@ -249,6 +249,18 @@ def _daily_advice(prices, now, context, power_w, language):
             stamps = [datetime.fromisoformat(value).astimezone(timezone.utc) for value in (grid_time, solar_time)]
             if abs((stamps[0] - stamps[1]).total_seconds()) <= 60 and all(0 <= (now - stamp).total_seconds() <= 900 for stamp in stamps):
                 baseline = solar + grid
+    # Explain why the conditional solar scenario cannot be calculated.
+    solar_diagnostics = []
+    if power_w is None:
+        solar_diagnostics.append("flexible_load_power_missing")
+    if grid is None:
+        solar_diagnostics.append("grid_power_unavailable")
+    if solar is None:
+        solar_diagnostics.append("solar_power_unavailable")
+    if grid is not None and solar is not None and baseline is None:
+        solar_diagnostics.append("power_measurements_not_synchronized")
+    if not series:
+        solar_diagnostics.append("solar_forecast_series_unavailable")
     days, advice, solar_options, chart = [], [], [], []
     today = now.astimezone(AMSTERDAM).date()
     for offset in range(3):
@@ -276,20 +288,32 @@ def _daily_advice(prices, now, context, power_w, language):
                 advice.append(daily["window"])
             if power_w is not None and baseline is not None and series:
                 adjusted = []
+                missing_export_price = False
+                incomplete_solar_interval = False
                 solar_times = set()
                 for item in entries:
                     own = _solar_load_energy(series, item.time.timestamp(), (item.time + step).timestamp(), baseline, power_w)
-                    if own is None or item.time not in export_map:
+                    if own is None:
+                        incomplete_solar_interval = True
+                        continue
+                    if item.time not in export_map:
+                        missing_export_price = True
                         continue
                     if own > 0:
                         solar_times.add(item.time)
                     load = power_w / 1000 * minutes / 60
                     cost = (load - own) * item.price + own * export_map[item.time]
                     adjusted.append(PriceEntry(item.time, cost / load))
+                if incomplete_solar_interval:
+                    solar_diagnostics.append("solar_forecast_interval_incomplete")
+                if missing_export_price:
+                    solar_diagnostics.append("export_price_missing")
                 solar_plan = optimize_intervals(
                     adjusted, duration, alternatives=0, resolution_minutes=minutes,
                     window_filter=lambda window, times=solar_times: any(item.time in times for item in window),
                 )
+                if not solar_plan:
+                    solar_diagnostics.append("no_eligible_solar_window")
                 if solar_plan:
                     selected = [datetime.fromisoformat(item["time"]) for item in solar_plan["selected_intervals"]]
                     reference = sum(price_map[stamp] for stamp in selected) / len(selected)
@@ -299,6 +323,8 @@ def _daily_advice(prices, now, context, power_w, language):
         days.append(daily)
     if solar_options:
         advice.append(min(solar_options, key=lambda item: item["estimated_cost_eur"]))
+    elif not solar_diagnostics:
+        solar_diagnostics.append("no_eligible_solar_window")
     grid_windows = [day["window"] for day in days if day["window"]]
     best = min(grid_windows, key=lambda item: item["average_price_eur_kwh"], default=None)
     return {
@@ -306,6 +332,8 @@ def _daily_advice(prices, now, context, power_w, language):
         "advice": advice[:3], "chart": chart[:300], "forecast_quality": forecast.get("quality", "unavailable"),
         "measured_grid_power_w": grid, "measured_export_w": max(0, -grid) if grid is not None else None,
         "assumed_household_load_w": baseline, "realized_savings_eur": None,
+        "solar_scenario_available": bool(solar_options),
+        "solar_diagnostics": sorted(set(solar_diagnostics)) if not solar_options else [],
         "heat_cost_note": ("Het bestaande warmteadvies vergelijkt ingekochte energie; gemiste terugleveropbrengst is daarin niet meegerekend."
                            if nl else "Existing heat advice compares purchased energy; foregone export revenue is not included in that heat model."),
         "summary": (("Plan alleen binnen gepubliceerde prijsintervallen. Zonneadvies is een voorwaardelijk scenario."
