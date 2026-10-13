@@ -6,10 +6,10 @@
 2. Bump `custom_components/nl_day_ahead_prices/manifest.json` to the intended
    SemVer version. Keep `pyproject.toml` aligned according to project convention;
    only the manifest drives release automation.
-3. Prepare CHANGELOG.md in the PR, review, then merge.
+3. Prepare CHANGELOG.md and a complete bilingual `docs/releases/v<version>.md`\n   (sections `## English` and `## Nederlands`) in the PR; review, then merge.\n   Include practical setup steps, optional features and troubleshooting.\n   Invalid or empty curated notes block publishing before the tag is pushed.
 4. Wait for the `CI` workflow's `lint-test` job to pass on main.
 5. Its dependent `release` job creates `v<version>` and `EnerPrice v<version>`
-   using GitHub-generated release notes. The changelog is not rewritten.
+   using reviewed bilingual notes from `docs/releases/v<version>.md` when present.\n   For older versions without a dedicated notes file, GitHub-generated notes\n   are used as a compatibility fallback. The changelog is not rewritten.
 
 Do not create the tag yourself before automation runs. No automatic version
 increment occurs. No deployment or integration files are rewritten.
