@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.6.3 - 2026-10-13
+
+### Fixed
+- Keep valid, fresh Forecast.Solar power series when daily forecast sensors update. Previously, a normal sensor update cleared the series until the next scheduled refresh, temporarily hiding solar-aware advice. Existing age and same-day safeguards remain in place.
+
+
 ## 2.6.2 - 2026-10-13
 
 ### Fixed
