@@ -1,5 +1,7 @@
 # EnerPrice 2.6 — Wat is nieuw en hoe gebruik je het?
 
+**Taal:** [English](enerprice-v2-6-user-guide.md) | Nederlands
+
 EnerPrice 2.6 voegt de **Dagelijkse Energieadviseur** toe. Deze functie is optioneel: bestaande prijzen, sensoren en automatiseringen blijven werken. EnerPrice adviseert; het schakelt zelf geen apparaten in of uit.
 
 ## In vijf stappen beginnen

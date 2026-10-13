@@ -13,7 +13,7 @@
 - **Energy performance:** optionally select cumulative import/export/solar energy meters. Incomplete evidence stays unknown; estimated impact is not realized savings.
 - **Dashboard:** use `generate_dashboard_yaml` with `include_daily_advisor: true`; use `use_apexcharts: false` for built-in cards.
 - **Troubleshooting:** check `solar_scenario_available` and `solar_diagnostics` on the Daily Energy Advice entity.
-- **Step-by-step instructions:** [EnerPrice 2.6 user guide](docs/enerprice-v2-6-gebruikershandleiding.md) (Dutch).
+- **Step-by-step instructions:** [English user guide](docs/enerprice-v2-6-user-guide.md) and [Nederlandse handleiding](docs/enerprice-v2-6-gebruikershandleiding.md).
 
 
 ## 2.6.0 - 2026-10-12
