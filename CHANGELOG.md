@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased — planned 2.6.2
+
+### Fixed
+- Daily solar scenarios now accept P1 and solar-power snapshots taken up to five minutes apart **only when both readings are no more than five minutes old**. This reduces false `power_measurements_not_synchronized` results from sensors with different update frequencies; old readings still fail closed.
+- The ordinary grid-only advice remains available when a reliable solar scenario cannot be calculated.
+
+### Using the 2.6 features
+- **Daily Energy Advisor:** enable it in EnerPrice options, set your flexible appliance power (W) and duration (minutes), and inspect the Daily Energy Advice entity. It selects the cheapest fully priced interval; it does not switch appliances.
+- **Forecast.Solar:** optionally select forecast entities and actual P1/solar-power sensors. A separate conditional solar scenario considers expected production, assumed household demand and foregone export value. `best_window.model: grid_only` is normal; a solar alternative appears in `advice` with `model: solar_scenario`.
+- **Morning briefing:** optionally select a supported Home Assistant notification target, time and explicit consent. No notifications are sent without consent.
+- **Energy performance:** optionally select cumulative import/export/solar energy meters. Incomplete evidence stays unknown; estimated impact is not realized savings.
+- **Dashboard:** use `generate_dashboard_yaml` with `include_daily_advisor: true`; use `use_apexcharts: false` for built-in cards.
+- **Troubleshooting:** check `solar_scenario_available` and `solar_diagnostics` on the Daily Energy Advice entity.
+- **Step-by-step instructions:** [EnerPrice 2.6 user guide](docs/enerprice-v2-6-gebruikershandleiding.md) (Dutch).
+
+
 ## 2.6.0 - 2026-10-12
 
 ### Added
