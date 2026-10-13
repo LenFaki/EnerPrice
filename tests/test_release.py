@@ -69,6 +69,8 @@ def runner(monkeypatch, version="2.1.0", previous="2.0.3", failure=None):
         if args[:2] == ("git", "rev-parse"):
             return "a" * 40
         if args[:2] == ("git", "show"):
+            if ":docs/releases/" in args[2]:
+                raise subprocess.CalledProcessError(128, args)
             return json.dumps({"version": previous if args[2].startswith("b" * 40) else version})
         if args[:2] == ("gh", "api"):
             return json.dumps([[published("2.0.3")]])
