@@ -248,7 +248,7 @@ class NLDayAheadPricesOptionsFlow(config_entries.OptionsFlow):
         selected_target = data.get(CONF_DAILY_NOTIFY_TARGET, "")
         schema = {
             vol.Optional(CONF_DAILY_NOTIFY_ENABLED, default=data.get(CONF_DAILY_NOTIFY_ENABLED, notification_preference(self._current_options()))): bool,
-            vol.Optional(CONF_DAILY_NOTIFY_CONSENT, default=False): bool,
+            vol.Optional(CONF_DAILY_NOTIFY_CONSENT, default=data.get(CONF_DAILY_NOTIFY_CONSENT, False)): bool,
             vol.Optional(CONF_DAILY_NOTIFY_TARGET, default=selected_target if selected_target in targets else ""):
                 SelectSelector(SelectSelectorConfig(options=["", *targets])),
             vol.Optional(CONF_DAILY_NOTIFY_TIME, default=data.get(CONF_DAILY_NOTIFY_TIME, "08:00:00")): TimeSelector(),
