@@ -20,6 +20,14 @@ all-in tarieven, prijsanalyses, beste periodes, trends, prognoses en praktisch
 energieadvies. De standaard biedzone is `NL`, de valuta is `EUR` en prijzen
 worden als `EUR/kWh` aangeboden.
 
+## Nieuw in EnerPrice 2.6 — Dagelijkse Energieadviseur
+
+De optionele **Dagelijkse Energieadviseur** zoekt het voordeligste moment voor een flexibel apparaat op basis van gepubliceerde stroomprijzen. Met Forecast.Solar, P1 en zonneproductie kan EnerPrice daarnaast een **afzonderlijk voorwaardelijk zonnescenario** berekenen. Je kunt optioneel een dagelijkse melding instellen met expliciete toestemming en voorspellingen vergelijken met betrouwbare cumulatieve energiemetingen. EnerPrice schakelt zelf geen apparaten.
+
+**Begin eenvoudig:** zet de Dagelijkse Energieadviseur aan, vul het apparaatvermogen en de duur in, en bekijk eerst het gewone prijsadvies. Voeg zon, meldingen en prestatiemeting pas toe wanneer je die wilt gebruiken.
+
+**[Lees de volledige handleiding voor EnerPrice 2.6: instellen, gebruiken en problemen oplossen](docs/enerprice-v2-6-gebruikershandleiding.md).**
+
 ## EnerPrice v2.5 — Smart Setup en Smart Energy Advisor
 
 V2.5 voegt een optionele **Smart Setup** toe aan de bestaande Smart Energy Advisor. Via de EnerPrice-opties kun je de P1/netvermogenssensor, actuele zonneproductie, gasprijssensor, één flexibele verbruiker met vermogen, rendementen, gasinhoud, overschotdrempel en adviestaal opslaan. De adviseur gebruikt deze waarden daarna automatisch. Expliciete waarden in een servicecall hebben altijd voorrang. Voor bestaande installaties blijft Smart Setup standaard uitgeschakeld, zodat v2.4.x-gedrag behouden blijft.
