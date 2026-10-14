@@ -61,6 +61,28 @@ Een voorkeur inschakelen is op zichzelf geen toestemming. De melding bevat het b
 
 Voor de optionele energieprestatiecontrole zijn **cumulatieve**, niet dagelijks terugzettende kWh/Wh-meters voor netafname en teruglevering nodig, plus een cumulatieve zonne-energiemeter. EnerPrice vergelijkt alleen gegevens wanneer metingen en daggrenzen voldoende compleet en betrouwbaar zijn. Ontbrekende gegevens blijven onbekend. De functie bewijst geen daadwerkelijke financiële besparing.
 
+## Dashboardvoorbeelden
+
+Onderstaande schermafbeeldingen komen uit een bestaande Home Assistant-installatie. Entiteitsnamen, leveranciersprijzen, apparaatinstellingen en meetwaarden verschillen per gebruiker. Dit is een zelf ingericht Home Assistant Sections-dashboard; EnerPrice installeert dit dashboard niet automatisch.
+
+### Compleet dashboard
+
+![EnerPrice dashboard met stroomprijzen, Smart Energy, prijsgrafiek en Dagelijkse Energieadviseur](images/dashboard-compleet.jpg)
+
+### Prijsadvies en Smart Energy
+
+![EnerPrice prijsadvies en Smart Energy-advies](images/dashboard-prijsadvies-smart-energy.jpg)
+
+### Prijsgrafiek en Dagelijkse Energieadviseur
+
+![EnerPrice prijsgrafiek en beste gebruiksmoment](images/dashboard-prijsgrafiek-dagelijks-advies.jpg)
+
+### Zonbewust advies
+
+![EnerPrice zonbewust advies en uitleg bij de energiecontrole](images/dashboard-zonbewust-advies.jpg)
+
+Het netstroomadvies en het voorwaardelijke zonnescenario zijn afzonderlijk. Verwachte voordelen zijn geen bewezen besparingen. De screenshots zijn voorbeelden, geen standaard-entiteitsnamen of gegarandeerde uitkomsten.
+
 ## Dashboard en gebruiksgemak
 
 Genereer een dashboard via `nl_day_ahead_prices.generate_dashboard_yaml` met `include_daily_advisor: true`. Zonder ApexCharts kun je `use_apexcharts: false` gebruiken. Bestaande dashboards worden **niet automatisch overschreven**.

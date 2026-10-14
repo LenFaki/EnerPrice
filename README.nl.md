@@ -1,19 +1,19 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/LenFaki/home-assistant-nl-day-ahead-prices/main/brand/enerprice-header-nl.png" alt="EnerPrice - Dynamische energieprijzen voor Home Assistant" width="100%">
+  <img src="https://raw.githubusercontent.com/LenFaki/EnerPrice/main/brand/enerprice-header-nl.png" alt="EnerPrice - Dynamische energieprijzen voor Home Assistant" width="100%">
 </p>
 
 # EnerPrice
 
 **Taal:** [English](README.md) | Nederlands
 
-**Ontwikkelpreview:** [Daily Energy Advisor PR3](docs/daily-advisor-pr3.md) voegt
-HA-ochtendmeldingen met expliciete toestemming en begrensde energiecontrole toe.
-Voorspeld en werkelijk blijven gescheiden; potentieel verschil is geen bewezen besparing.
+**EnerPrice 2.6:** de Dagelijkse Energieadviseur ondersteunt optioneel zonneadvies,
+ochtendmeldingen met expliciete toestemming en conservatieve energiecontrole.
+Potentieel voordeel is geen bewezen gerealiseerde besparing.
 
 EnerPrice is een HACS-compatibele custom integratie voor Home Assistant voor
 Nederlandse dynamische energieprijzen. De integratie heette eerder **NL Day
-Ahead Prices**. De repositorynaam en het integratiedomein
-`nl_day_ahead_prices` blijven ongewijzigd voor achterwaartse compatibiliteit.
+Ahead Prices**. De GitHub-repository heet nu `LenFaki/EnerPrice`. Het interne Home Assistant-domein
+`nl_day_ahead_prices` blijft ongewijzigd voor achterwaartse compatibiliteit.
 
 EnerPrice levert day-ahead stroomprijzen, kwartierprijzen, leveranciersspecifieke
 all-in tarieven, prijsanalyses, beste periodes, trends, prognoses en praktisch
@@ -25,6 +25,8 @@ worden als `EUR/kWh` aangeboden.
 De optionele **Dagelijkse Energieadviseur** zoekt het voordeligste moment voor een flexibel apparaat op basis van gepubliceerde stroomprijzen. Met Forecast.Solar, P1 en zonneproductie kan EnerPrice daarnaast een **afzonderlijk voorwaardelijk zonnescenario** berekenen. Je kunt optioneel een dagelijkse melding instellen met expliciete toestemming en voorspellingen vergelijken met betrouwbare cumulatieve energiemetingen. EnerPrice schakelt zelf geen apparaten.
 
 **Begin eenvoudig:** zet de Dagelijkse Energieadviseur aan, vul het apparaatvermogen en de duur in, en bekijk eerst het gewone prijsadvies. Voeg zon, meldingen en prestatiemeting pas toe wanneer je die wilt gebruiken.
+
+Bekijk ook de [dashboardvoorbeelden](docs/enerprice-v2-6-gebruikershandleiding.md#dashboardvoorbeelden).
 
 **[Lees de volledige Nederlandstalige handleiding voor EnerPrice 2.6](docs/enerprice-v2-6-gebruikershandleiding.md)** of de [English user guide](docs/enerprice-v2-6-user-guide.md).
 

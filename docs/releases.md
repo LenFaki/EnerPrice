@@ -72,7 +72,7 @@ After reviewing and merging this workflow PR:
 Equivalent explicit command (only after merge, when publication is intended):
 
 ```sh
-gh workflow run ci.yml --repo LenFaki/home-assistant-nl-day-ahead-prices --ref main
+gh workflow run ci.yml --repo LenFaki/EnerPrice --ref main
 ```
 
 If publication failed before tag creation, rerun CI on main using that manual

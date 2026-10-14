@@ -1,23 +1,23 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/LenFaki/home-assistant-nl-day-ahead-prices/main/brand/enerprice-header-en.png" alt="EnerPrice - Dynamic Energy Prices for Home Assistant" width="100%">
+  <img src="https://raw.githubusercontent.com/LenFaki/EnerPrice/main/brand/enerprice-header-en.png" alt="EnerPrice - Dynamic Energy Prices for Home Assistant" width="100%">
 </p>
 
 # EnerPrice
 
 **Language:** English | [Nederlands](README.nl.md)
 
-**Development preview:** [Daily Energy Advisor PR3](docs/daily-advisor-pr3.md) adds
-consent-gated HA morning briefings and bounded predicted-versus-actual energy checks
-to the existing advice/dashboard. Potential savings are not proven realized savings.
+**EnerPrice 2.6:** Daily Energy Advisor supports optional solar-aware scenarios,
+consent-gated morning briefings and conservative forecast-versus-actual checks.
+Potential savings are not verified realized savings.
 
-[![GitHub Release](https://img.shields.io/github/v/release/LenFaki/home-assistant-nl-day-ahead-prices?style=flat-square)](https://github.com/LenFaki/home-assistant-nl-day-ahead-prices/releases)
-[![Status](https://img.shields.io/badge/status-stable-green.svg?style=flat-square)](https://github.com/LenFaki/home-assistant-nl-day-ahead-prices)
+[![GitHub Release](https://img.shields.io/github/v/release/LenFaki/EnerPrice?style=flat-square)](https://github.com/LenFaki/EnerPrice/releases)
+[![Status](https://img.shields.io/badge/status-stable-green.svg?style=flat-square)](https://github.com/LenFaki/EnerPrice)
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=flat-square)](https://hacs.xyz/)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Custom%20Integration-18BCF2?logo=homeassistant&logoColor=white&style=flat-square)](https://www.home-assistant.io/)
 [![Open your Home Assistant instance and open this repository inside HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=LenFaki&repository=home-assistant-nl-day-ahead-prices&category=integration)
-[![Tests](https://github.com/LenFaki/home-assistant-nl-day-ahead-prices/actions/workflows/ci.yml/badge.svg)](https://github.com/LenFaki/home-assistant-nl-day-ahead-prices/actions/workflows/ci.yml)
-[![HACS validation](https://github.com/LenFaki/home-assistant-nl-day-ahead-prices/actions/workflows/hacs.yml/badge.svg)](https://github.com/LenFaki/home-assistant-nl-day-ahead-prices/actions/workflows/hacs.yml)
-[![Hassfest](https://github.com/LenFaki/home-assistant-nl-day-ahead-prices/actions/workflows/hassfest.yml/badge.svg)](https://github.com/LenFaki/home-assistant-nl-day-ahead-prices/actions/workflows/hassfest.yml)
+[![Tests](https://github.com/LenFaki/EnerPrice/actions/workflows/ci.yml/badge.svg)](https://github.com/LenFaki/EnerPrice/actions/workflows/ci.yml)
+[![HACS validation](https://github.com/LenFaki/EnerPrice/actions/workflows/hacs.yml/badge.svg)](https://github.com/LenFaki/EnerPrice/actions/workflows/hacs.yml)
+[![Hassfest](https://github.com/LenFaki/EnerPrice/actions/workflows/hassfest.yml/badge.svg)](https://github.com/LenFaki/EnerPrice/actions/workflows/hassfest.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20EnerPrice-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white)](https://ko-fi.com/lenfaki)
 
@@ -33,9 +33,8 @@ energieadvies voor Home Assistant.
 
 ## Previously Known As NL Day Ahead Prices
 
-EnerPrice was previously named **NL Day Ahead Prices**. The repository and
-integration domain remain `home-assistant-nl-day-ahead-prices` and
-`nl_day_ahead_prices` for backwards compatibility. Existing v1.x unique IDs,
+EnerPrice was previously named **NL Day Ahead Prices**. The GitHub repository is now `LenFaki/EnerPrice`, while the Home Assistant
+integration domain remains `nl_day_ahead_prices` for backwards compatibility. Existing v1.x unique IDs,
 entity IDs, automations, and dashboards are not renamed by this release.
 
 It is inspired by the sensor and ApexCharts attribute shape of `hass-entso-e`, but it avoids depending on ENTSO-E by default. Prices are fetched from alternative providers with automatic fallback:
@@ -53,7 +52,7 @@ The optional Daily Energy Advisor finds a cheapest fully priced period for a con
 
 **Start simple:** enable Daily Advisor, enter the appliance power and duration, and check the grid-only recommendation first. Add solar inputs, notifications and performance checks only when useful.
 
-See the [step-by-step EnerPrice 2.6 guide (English)](docs/enerprice-v2-6-user-guide.md) or the [Nederlandse handleiding](docs/enerprice-v2-6-gebruikershandleiding.md) for configuration, interpretation and troubleshooting.
+See [dashboard screenshots](docs/enerprice-v2-6-user-guide.md#dashboard-examples) and the [step-by-step EnerPrice 2.6 guide (English)](docs/enerprice-v2-6-user-guide.md) or the [Nederlandse handleiding](docs/enerprice-v2-6-gebruikershandleiding.md) for configuration, interpretation and troubleshooting.
 
 ## EnerPrice v2.5 — Smart Setup and Smart Energy Advisor
 
