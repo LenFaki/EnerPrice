@@ -435,3 +435,33 @@ async def test_smart_advisor_subscribes_to_forecast_without_legacy_inputs(monkey
     await sensor.async_added_to_hass()
     coordinator.daily_forecast.async_add_listener.assert_called_once_with(sensor.async_write_ha_state)
     sensor.async_on_remove.assert_called_once_with(coordinator.daily_forecast.async_add_listener.return_value)
+
+
+def test_daily_advice_cache_hit_skips_utc_price_conversion(monkeypatch):
+    """Reading daily advice twice in one minute must not rebuild UTC prices."""
+    import custom_components.nl_day_ahead_prices.daily_advisor as module
+    from custom_components.nl_day_ahead_prices import models
+
+    prices = prices_for_day()
+    entry = SimpleNamespace(data={}, options={})
+    coordinator = SimpleNamespace(
+        entry=entry,
+        hass=SimpleNamespace(config=SimpleNamespace(language="en")),
+        data=object(),
+        daily_forecast=SimpleNamespace(data=object()),
+        analysis_cache={},
+    )
+    monkeypatch.setattr(module.dt_util, "utcnow", lambda: NOW.astimezone(timezone.utc))
+    monkeypatch.setattr(
+        "custom_components.nl_day_ahead_prices.sensor._cached_all_in_entries",
+        lambda *_: prices,
+    )
+    monkeypatch.setattr(module, "advisor_context", lambda *_: context(prices))
+    first = module.daily_advice(coordinator)
+    assert first["state"] in {"ready", "unavailable"}
+
+    def fail_on_conversion(*args, **kwargs):
+        raise AssertionError("cache hit should not rebuild PriceEntry objects")
+
+    monkeypatch.setattr(models, "PriceEntry", fail_on_conversion)
+    assert module.daily_advice(coordinator) is first
