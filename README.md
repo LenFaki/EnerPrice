@@ -155,19 +155,12 @@ covers efficiency loss and a safety margin.
 ### Solar Export Advisor
 
 The Export Advisor, Best Export Period, Worst Export Period, and Current Sell
-Price sensors use the supplier profile's export and feed-in fees. The sell price
-is the market price minus those fees. VAT is added to the market price unless
-the supplier pays feed-in excluding VAT (a registry tariff with
-`export_market_vat_included: false`, or a custom supplier with
-`custom_sell_market_price_includes_vat` turned off):
+Price sensors use the supplier profile's export and feed-in fees: the sell price
+is the market price minus those fees. See the
+[supplier tariff registry](docs/supplier-tariff-registry.md#amounts-and-compatibility)
+for how VAT is applied.
 
-```text
-sell = market_price * (1 + vat) - export_fee    # default
-sell = market_price - export_fee                # market price paid excluding VAT
-```
-
-The
-`nl_day_ahead_prices.find_best_export_window` service can also estimate export
+The `nl_day_ahead_prices.find_best_export_window` service can also estimate export
 revenue for a specified amount of energy.
 
 ### Appliance Planner
@@ -327,8 +320,7 @@ screen shows the custom tariff fields:
 - `custom_purchase_fee_includes_vat`
 - `custom_sell_fee_electricity`
 - `custom_sell_fee_includes_vat`
-- `custom_sell_market_price_includes_vat` (default on; turn off when your
-  supplier pays the market price for feed-in excluding VAT)
+- `custom_sell_market_price_includes_vat`
 
 Formula:
 

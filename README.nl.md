@@ -244,11 +244,9 @@ dezelfde bronprijs. De originele bronprijzen blijven beschikbaar via
 ## Belangrijkste entiteiten
 
 EnerPrice levert onder andere huidige en volgende marktprijs, huidige
-terugleverprijs (marktprijs min de terugleverkosten van de leverancier; de
-marktprijs is inclusief btw, tenzij de leverancier teruglevering exclusief btw
-uitbetaalt, zoals bij een registertarief met `export_market_vat_included: false` of een eigen leverancier met
-`custom_sell_market_price_includes_vat` uitgeschakeld), huidige en volgende all-in prijs, gemiddelden/minimum/maximum voor vandaag en morgen,
-geselecteerde leverancier, effectief prijsinterval, provider, laatste
+terugleverprijs (marktprijs min de terugleverkosten van de leverancier),
+huidige en volgende all-in prijs, gemiddelden/minimum/maximum voor vandaag en
+morgen, geselecteerde leverancier, effectief prijsinterval, provider, laatste
 succesvolle update, Price Advisor, Price Score, dagscore, terugleveradvies en
 Energy Opportunity.
 
