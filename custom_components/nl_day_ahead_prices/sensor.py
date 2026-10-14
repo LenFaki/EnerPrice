@@ -11,7 +11,7 @@ from typing import Any
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorEntityDescription, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory, UnitOfEnergy
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -747,7 +747,7 @@ class NLSmartEnergyAdvisorSensor(CoordinatorEntity[NLDayAheadPricesCoordinator],
             "name": "EnerPrice",
             "manufacturer": "EnerPrice",
         }
-        self._result: dict[str, Any] = {}
+        self._result: dict[str, Any] | None = None
 
     @property
     def suggested_object_id(self) -> str:
@@ -771,6 +771,18 @@ class NLSmartEnergyAdvisorSensor(CoordinatorEntity[NLDayAheadPricesCoordinator],
     def _async_input_changed(self, event: Any) -> None:
         """Refresh advice on the Home Assistant event loop."""
         self.hass.loop.call_soon_threadsafe(self.async_write_ha_state)
+
+    @callback
+    def async_write_ha_state(self) -> None:
+        """Invalidate the snapshot once per write, not between state and attributes."""
+        self._result = None
+        super().async_write_ha_state()
+
+    def _current_result(self) -> dict[str, Any]:
+        """Share one calculation between native_value and extra_state_attributes."""
+        if self._result is None:
+            self._result = self._advice()
+        return self._result
 
     def _advice(self) -> dict[str, Any]:
         data = self.coordinator.data
@@ -805,13 +817,15 @@ class NLSmartEnergyAdvisorSensor(CoordinatorEntity[NLDayAheadPricesCoordinator],
 
     @property
     def native_value(self) -> str:
-        self._result = self._advice()
-        return str(self._result["state"])
+        return str(self._current_result()["state"])
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        self._result = self._advice()
-        return {key: (value.isoformat() if isinstance(value, datetime) else value) for key, value in self._result.items() if key != "state"}
+        return {
+            key: (value.isoformat() if isinstance(value, datetime) else value)
+            for key, value in self._current_result().items()
+            if key != "state"
+        }
 
 
 def _state_float_sensor(hass: HomeAssistant, entity_id: str | None) -> float | None:
