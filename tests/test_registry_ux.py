@@ -303,7 +303,12 @@ def test_translations_and_version():
         assert set(content["entity"]["sensor"]["supplier_registry_status"]["state"]) == {
             "remote", "cached_remote", "bundled",
         }
-    assert json.loads((base / "manifest.json").read_text())["version"] == "2.6.3"
+    # Keep the manifest and project metadata aligned without pinning this test
+    # to a particular release number.
+    import tomllib
+
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    assert json.loads((base / "manifest.json").read_text())["version"] == project["project"]["version"]
     for path in (base / "strings.json", base / "translations/en.json", base / "translations/nl.json"):
         content = json.loads(path.read_text())
         assert "smart_setup" in content["options"]["step"]
