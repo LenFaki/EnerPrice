@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import timedelta, timezone
+from time import perf_counter
 
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
@@ -78,12 +79,25 @@ def daily_advice(coordinator, language=None):
         # Absolute timestamps avoid same-zone repeated-hour comparisons.
         from .models import PriceEntry
 
+        started = perf_counter()
         utc_prices = [PriceEntry(item.time.astimezone(timezone.utc), item.price) for item in prices]
+        conversion_ms = (perf_counter() - started) * 1000
+        context = advisor_context(coordinator)
+        context_ms = (perf_counter() - started) * 1000 - conversion_ms
         result = build_smart_energy_advice(
             electricity_price=None, future_prices=utc_prices, now=now,
             flexible_load_power_w=options.get(CONF_FLEXIBLE_LOAD_POWER_W), language=language,
-            daily_context=advisor_context(coordinator),
+            daily_context=context,
         )["daily_advisor"]
+        calculation_ms = (perf_counter() - started) * 1000 - conversion_ms - context_ms
+        total_ms = (perf_counter() - started) * 1000
+        if total_ms >= 250:
+            _LOGGER.warning(
+                "EnerPrice Daily Advisor recomputation took %.1f ms "
+                "(UTC prices: %.1f ms, context: %.1f ms, advice: %.1f ms; "
+                "price entries: %d). Check for repeated warnings and report timings.",
+                total_ms, conversion_ms, context_ms, calculation_ms, len(prices),
+            )
         cache["daily_advice"] = (signature, result)
     return cache["daily_advice"][1]
 
