@@ -1,12 +1,5 @@
 # Changelog
 
-## Unreleased - Sell price sensor
-
-### Added
-- Add a Current Sell Price sensor: the market price minus the supplier's export and feed-in fees, the same calculation used by the Export Advisor.
-- Add `sell_prices_today` and `sell_prices_tomorrow` chart attributes and `sell_price`/`supplier_export_fee` attributes to price sensors.
-- Accept the optional registry field `export_market_vat_included` and add the custom-supplier option `custom_sell_market_price_includes_vat` (both default on) for suppliers that pay the feed-in market price excluding VAT. The existing `export_vat_included` flag still only applies to the export fee. The published remote registry does not use the new field yet; it will be introduced in a later registry revision so that older clients keep accepting it.
-
 ## 2.6.3 - 2026-10-13
 
 ### Fixed
