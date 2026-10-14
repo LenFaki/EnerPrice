@@ -1,5 +1,6 @@
 from datetime import date, datetime, timezone
 
+from custom_components.nl_day_ahead_prices.models import PriceEntry
 from custom_components.nl_day_ahead_prices.providers import parse_energy_charts, parse_nord_pool
 
 
@@ -62,3 +63,14 @@ def test_parse_energy_charts_filters_day_and_converts_to_eur_kwh() -> None:
 
     assert len(prices) == 1
     assert prices[0].price == 0.05
+
+
+def test_parse_energy_charts_buckets_by_nl_local_day_not_utc_day() -> None:
+    # 23:30 UTC on Jan 15 is 00:30 CET on Jan 16 in the Netherlands: it must
+    # land in the Jan 16 bucket, not be dropped into (or missing from) Jan 15
+    # just because its UTC timestamp still reads Jan 15.
+    late_utc = datetime(2026, 1, 15, 23, 30, tzinfo=timezone.utc)
+    payload = {"unix_seconds": [int(late_utc.timestamp())], "price": [50]}
+
+    assert parse_energy_charts(payload, date(2026, 1, 16)) == [PriceEntry(late_utc, 0.05)]
+    assert parse_energy_charts(payload, date(2026, 1, 15)) == []
