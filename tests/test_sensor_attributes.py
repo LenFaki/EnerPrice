@@ -45,7 +45,7 @@ def sensor_module(monkeypatch):
         "homeassistant.config_entries": {"ConfigEntry": object},
         "homeassistant.const": {"UnitOfEnergy": SimpleNamespace(KILO_WATT_HOUR="kWh"),
                                 "EntityCategory": SimpleNamespace(DIAGNOSTIC="diagnostic")},
-        "homeassistant.core": {"HomeAssistant": object},
+        "homeassistant.core": {"HomeAssistant": object, "callback": lambda func: func},
         "homeassistant.helpers": {},
         "homeassistant.helpers.entity_platform": {"AddEntitiesCallback": object},
         "homeassistant.helpers.event": {"async_track_state_change_event": lambda *args, **kwargs: (lambda: None)},
@@ -314,3 +314,29 @@ def test_rating_does_not_calculate_trend(sensor_module, monkeypatch):
         Mock(side_effect=AssertionError("rating must not calculate trend")),
     )
     assert sensor.native_value in {"low", "normal", "high"}
+
+
+def test_smart_advisor_calculates_once_per_state_write(sensor_module, monkeypatch):
+    """Native state and attributes must share a snapshot; the next write refreshes it."""
+    coordinator = SimpleNamespace(data=object(), daily_forecast=None)
+    entry = SimpleNamespace(entry_id="test", data={}, options={})
+    sensor = sensor_module.NLSmartEnergyAdvisorSensor(coordinator, entry)
+    calls = []
+
+    def advice():
+        calls.append(len(calls) + 1)
+        return {"state": "cheap_grid", "recommendation": f"result {len(calls)}"}
+
+    monkeypatch.setattr(sensor, "_advice", advice)
+    assert sensor.native_value == "cheap_grid"
+    assert sensor.extra_state_attributes["recommendation"] == "result 1"
+    assert len(calls) == 1
+
+    # CoordinatorEntity's parent write is normally provided by HA.
+    monkeypatch.setattr(
+        type(sensor).__mro__[1], "async_write_ha_state", lambda self: None, raising=False
+    )
+    sensor.async_write_ha_state()
+    assert sensor.extra_state_attributes["recommendation"] == "result 2"
+    assert sensor.native_value == "cheap_grid"
+    assert len(calls) == 2
