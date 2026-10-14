@@ -64,6 +64,28 @@ Enabling a preference alone does not grant consent. Delivery is attempted at mos
 
 Optional energy performance tracking requires **cumulative** import and export energy counters in Wh/kWh, plus a cumulative solar energy counter. Do **not** use daily-reset meters. EnerPrice compares predictions with actual energy only when readings and day boundaries are complete and reliable. Missing evidence stays unknown; the feature does not establish realized financial savings.
 
+## Dashboard examples
+
+These are example screenshots from a real Home Assistant installation. Sensor names, supplier tariffs, appliance settings and values will differ on your system. The screens use a custom Home Assistant Sections dashboard; EnerPrice does not automatically install this dashboard.
+
+### Full dashboard
+
+![EnerPrice dashboard with prices, Smart Energy, chart and Daily Energy Advisor](images/dashboard-compleet.jpg)
+
+### Price advice and Smart Energy
+
+![EnerPrice price advice and Smart Energy Advisor](images/dashboard-prijsadvies-smart-energy.jpg)
+
+### Price chart and Daily Energy Advisor
+
+![EnerPrice day-ahead price chart and daily consumption advice](images/dashboard-prijsgrafiek-dagelijks-advies.jpg)
+
+### Solar-aware advice
+
+![EnerPrice solar-aware advice and energy-check explanation](images/dashboard-zonbewust-advies.jpg)
+
+The grid-only recommendation and conditional solar scenario are separate; forecast savings are not verified realized savings. Screenshots illustrate one configuration, not default entity IDs or guaranteed results.
+
 ## Dashboards and a simple setup path
 
 Generate dashboard YAML with `nl_day_ahead_prices.generate_dashboard_yaml` and `include_daily_advisor: true`. Use `use_apexcharts: false` for a dashboard based on built-in Home Assistant cards. Existing dashboards are **not overwritten automatically**.
