@@ -15,7 +15,7 @@ import subprocess
 from typing import Any
 
 MANIFEST = "custom_components/nl_day_ahead_prices/manifest.json"
-REPOSITORY = "LenFaki/home-assistant-nl-day-ahead-prices"
+REPOSITORY = "LenFaki/EnerPrice"
 SEMVER = re.compile(
     r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
     r"(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?"
