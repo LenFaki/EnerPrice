@@ -471,3 +471,23 @@ def test_daily_advice_cache_hit_skips_utc_price_conversion(monkeypatch):
 
     monkeypatch.setattr(models, "PriceEntry", fail_on_conversion)
     assert module.daily_advice(coordinator) is first
+
+
+@pytest.mark.parametrize("elapsed,expected_warning", [(.31, True), (.004, False)])
+def test_daily_advice_profiling_warns_only_on_slow_cache_misses(advice_runtime, monkeypatch, elapsed, expected_warning):
+    """Diagnostic timings must not change advice or warn on cache hits."""
+    module = advice_runtime.adapter.module
+    coordinator = advice_runtime.coordinator
+    # started, conversion end, context end, calculation end, total end.
+    ticks = iter([0.0, .001, .002, elapsed - .001, elapsed])
+    monkeypatch.setattr(module, "perf_counter", lambda: next(ticks))
+    warning = Mock()
+    monkeypatch.setattr(module._LOGGER, "warning", warning)
+
+    result = module.daily_advice(coordinator)
+    assert module.daily_advice(coordinator) is result
+    assert warning.called is expected_warning
+    if expected_warning:
+        assert warning.call_count == 1
+        assert "recomputation took" in warning.call_args.args[0]
+        assert warning.call_args.args[1] == pytest.approx(elapsed * 1000)
