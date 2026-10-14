@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.6.4 - 2026-10-14
+
+### Performance
+- Reuse the Smart Energy Advisor calculation between native state and attributes during each Home Assistant entity write; invalidate the snapshot on the next update.
+- Avoid rebuilding UTC price entries when Daily Energy Advice already has a valid cached result.
+- Add regression coverage for both optimizations.
+
+### Compatibility
+- No changes to entity IDs, integration domain, public attributes, supplier tariffs or pricing logic.
+- Current Market Price performance was not directly changed; any remaining slow-state-update warnings need separate profiling.
+
+
 ## 2.6.3 - 2026-10-13
 
 ### Fixed

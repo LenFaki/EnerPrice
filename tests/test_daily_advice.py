@@ -435,3 +435,39 @@ async def test_smart_advisor_subscribes_to_forecast_without_legacy_inputs(monkey
     await sensor.async_added_to_hass()
     coordinator.daily_forecast.async_add_listener.assert_called_once_with(sensor.async_write_ha_state)
     sensor.async_on_remove.assert_called_once_with(coordinator.daily_forecast.async_add_listener.return_value)
+
+
+def test_daily_advice_cache_hit_skips_utc_price_conversion(monkeypatch):
+    """Reading daily advice twice in one minute must not rebuild UTC prices."""
+    import sys
+    from types import ModuleType
+
+    from custom_components.nl_day_ahead_prices import models, smart_energy
+    from tests.test_daily_forecast import load_adapter
+
+    # Load the real advisor through the project's existing HA-free test adapter.
+    module = load_adapter(monkeypatch).module
+    prices = prices_for_day()
+    sensor_stub = ModuleType("custom_components.nl_day_ahead_prices.sensor")
+    sensor_stub._cached_all_in_entries = lambda *_: prices
+    monkeypatch.setitem(sys.modules, sensor_stub.__name__, sensor_stub)
+    monkeypatch.setattr(module, "advisor_context", lambda *_: {})
+    monkeypatch.setattr(smart_energy, "build_smart_energy_advice",
+                        Mock(return_value={"daily_advisor": {"state": "ready"}}))
+
+    coordinator = SimpleNamespace(
+        entry=SimpleNamespace(data={}, options={}),
+        hass=SimpleNamespace(config=SimpleNamespace(language="en")),
+        data=object(),
+        daily_forecast=SimpleNamespace(data=object()),
+        analysis_cache={},
+    )
+    module.dt_util.utcnow = lambda: NOW.astimezone(timezone.utc)
+    first = module.daily_advice(coordinator)
+    assert first["state"] == "ready"
+
+    def fail_on_conversion(*args, **kwargs):
+        raise AssertionError("cache hit should not rebuild PriceEntry objects")
+
+    monkeypatch.setattr(models, "PriceEntry", fail_on_conversion)
+    assert module.daily_advice(coordinator) is first
