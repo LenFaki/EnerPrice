@@ -255,6 +255,16 @@ def test_large_chart_attributes_are_unrecorded_but_remain_public(sensor_module):
     assert attrs["all_in_prices"] == attrs["all_in_prices_today"] + attrs["all_in_prices_tomorrow"]
 
 
+def test_cheapest_block_attributes_are_unrecorded(sensor_module):
+    # Each block repeats its price entries; together with the chart arrays they
+    # push the state past the recorder's attribute size limit, which then drops
+    # every attribute for that state.
+    attrs = make_sensor(sensor_module, day_prices("2026-09-08", 15), extended=True).extra_state_attributes
+    cheapest = {key for key in attrs if key.startswith("cheapest_")}
+    assert len(cheapest) == 7
+    assert cheapest <= sensor_module.NLDayAheadPriceSensor._unrecorded_attributes
+
+
 def test_trajectory_reuses_all_in_and_trend_within_coordinator_cycle(sensor_module, monkeypatch):
     """Trajectory state and attributes must share expensive analysis work."""
     sensor = make_sensor(sensor_module, day_prices("2026-09-08", 15), extended=True)
