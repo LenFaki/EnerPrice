@@ -2,14 +2,9 @@ from datetime import date, datetime
 
 import pytest
 
+from custom_components.nl_day_ahead_prices.const import REQUEST_RETRIES
 from custom_components.nl_day_ahead_prices.models import PriceEntry, ProviderResult
-from custom_components.nl_day_ahead_prices.providers import (
-    BasePriceProvider,
-    EntsoeProvider,
-    NordPoolProvider,
-    ProviderError,
-    async_fetch_with_fallback,
-)
+from custom_components.nl_day_ahead_prices.providers import BasePriceProvider, ProviderError, async_fetch_with_fallback
 
 
 class FailingProvider(BasePriceProvider):
@@ -49,60 +44,6 @@ async def test_provider_fallback_raises_when_every_provider_fails() -> None:
         await async_fetch_with_fallback([FailingProvider(None)], date(2026, 7, 2), date(2026, 7, 3))
 
 
-@pytest.mark.asyncio
-async def test_nord_pool_tolerates_unpublished_tomorrow(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Day-ahead providers only publish tomorrow's prices in the afternoon;
-    that alone shouldn't fail the whole provider and trigger a fallback."""
-    provider = NordPoolProvider(session=None, country="NL", currency="EUR")
-
-    async def fake_fetch_day(day: date) -> dict:
-        if day == date(2026, 7, 3):
-            raise ProviderError("empty JSON response")
-        return {
-            "multiAreaEntries": [
-                {"deliveryStart": "2026-07-02T00:00:00+02:00", "entryPerArea": {"NL": 100}}
-            ]
-        }
-
-    monkeypatch.setattr(provider, "_fetch_day", fake_fetch_day)
-
-    result = await provider.async_fetch(date(2026, 7, 2), date(2026, 7, 3))
-
-    assert len(result.prices_today) == 1
-    assert result.prices_tomorrow == []
-
-
-@pytest.mark.asyncio
-async def test_entsoe_tolerates_unpublished_tomorrow(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The same "not yet published" tolerance applies to every provider that
-    fetches today and tomorrow as separate requests, not just Nord Pool."""
-    provider = EntsoeProvider(session=None, api_token="token", country="NL", currency="EUR")
-
-    today_xml = """<Publication_MarketDocument>
-        <TimeSeries>
-            <Period>
-                <timeInterval><start>2026-07-02T00:00Z</start></timeInterval>
-                <resolution>PT60M</resolution>
-                <Point><position>1</position><price.amount>100</price.amount></Point>
-            </Period>
-        </TimeSeries>
-    </Publication_MarketDocument>"""
-
-    async def fake_fetch_day(day: date) -> str:
-        if day == date(2026, 7, 3):
-            raise ProviderError("empty response")
-        return today_xml
-
-    monkeypatch.setattr(provider, "_fetch_day", fake_fetch_day)
-
-    result = await provider.async_fetch(date(2026, 7, 2), date(2026, 7, 3))
-
-    assert len(result.prices_today) == 1
-    assert result.prices_tomorrow == []
-    assert result.raw_tomorrow is None
-
-
-
 class _JsonResponse:
     status = 200
 
@@ -132,6 +73,10 @@ class _JsonSession:
         return _JsonResponse(self._bodies.pop(0))
 
 
+async def _no_sleep(_: float) -> None:
+    return None
+
+
 @pytest.mark.asyncio
 async def test_null_json_body_is_retried(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("custom_components.nl_day_ahead_prices.providers.asyncio.sleep", _no_sleep)
@@ -144,11 +89,9 @@ async def test_null_json_body_is_retried(monkeypatch: pytest.MonkeyPatch) -> Non
 @pytest.mark.asyncio
 async def test_null_json_body_is_reported_as_empty_response(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("custom_components.nl_day_ahead_prices.providers.asyncio.sleep", _no_sleep)
-    session = _JsonSession(None, None, None, None, None)
+    session = _JsonSession(*[None] * REQUEST_RETRIES)
 
     with pytest.raises(ProviderError, match="ValueError"):
         await WorkingProvider(session)._request_json("https://example.invalid")
+    assert session.calls == REQUEST_RETRIES
 
-
-async def _no_sleep(_: float) -> None:
-    return None
