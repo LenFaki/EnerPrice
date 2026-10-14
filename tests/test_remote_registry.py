@@ -162,7 +162,7 @@ async def test_invalid_envelope_preserves_good_cache(field, value):
 @pytest.mark.parametrize("field,value", [
     ("valid_from", "2026-02-30"), ("valid_until", "2026-99-01"),
     ("last_verified", "yesterday"), ("last_verified", "20260923"),
-    ("vat_included", 1), ("export_vat_included", "true"),
+    ("vat_included", 1), ("export_vat_included", "true"), ("export_market_vat_included", "false"),
     ("supports_hourly_prices", None), ("supports_quarter_hour_prices", 0),
     ("purchase_fee_import", float("nan")), ("purchase_fee_import", float("inf")),
     ("purchase_fee_import", "0.02"), ("purchase_fee_import", True),
@@ -248,6 +248,37 @@ def test_initial_remote_data_exactly_matches_bundle():
     assert candidate["suppliers"] == bundled["suppliers"]
     assert remote.parse_remote_registry(candidate).revision == 1
     assert remote.parse_remote_registry(candidate).suppliers["pure_energie"][0].purchase_fee_export == -0.01299
+
+
+def test_export_market_vat_flag_defaults_to_included():
+    parsed = remote.parse_remote_registry(payload())
+    assert all(p.sell_market_price_includes_vat for profiles in parsed.suppliers.values() for p in profiles)
+
+
+def test_export_market_vat_flag_is_accepted_when_present():
+    candidate = payload(3)
+    candidate["suppliers"]["pure_energie"]["tariffs"][0]["export_market_vat_included"] = False
+    parsed = remote.parse_remote_registry(candidate)
+    assert not parsed.suppliers["pure_energie"][0].sell_market_price_includes_vat
+    assert parsed.suppliers["anwb_energie"][0].sell_market_price_includes_vat
+
+
+def test_published_registry_does_not_use_export_market_vat_flag_yet():
+    # Released clients require the exact v1 field set and would reject the
+    # whole remote registry. Publish the field only in a separate registry
+    # revision once clients that accept it have been rolled out.
+    for path in (ROOT / "registry/supplier_tariffs.json", registry.REGISTRY_FILE):
+        data = json.loads(path.read_text())
+        for supplier in data["suppliers"].values():
+            for record in supplier["tariffs"]:
+                assert "export_market_vat_included" not in record, path
+
+
+def test_unknown_tariff_field_is_still_rejected():
+    candidate = payload()
+    candidate["suppliers"]["anwb_energie"]["tariffs"][0]["unexpected"] = True
+    with pytest.raises(ValueError):
+        remote.parse_remote_registry(candidate)
 
 
 def test_custom_and_date_fallback():

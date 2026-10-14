@@ -29,6 +29,7 @@ from .const import (
     CONF_CUSTOM_PURCHASE_FEE_INCLUDES_VAT,
     CONF_CUSTOM_SELL_FEE_ELECTRICITY,
     CONF_CUSTOM_SELL_FEE_INCLUDES_VAT,
+    CONF_CUSTOM_SELL_MARKET_PRICE_INCLUDES_VAT,
     CONF_CUSTOM_SUPPLIER_NAME,
     CONF_DAILY_ADVISOR_ENABLED,
     CONF_DAILY_CONSUMPTION_ENTITIES,
@@ -72,6 +73,7 @@ from .const import (
     DEFAULT_CUSTOM_PURCHASE_FEE_INCLUDES_VAT,
     DEFAULT_CUSTOM_SELL_FEE_ELECTRICITY,
     DEFAULT_CUSTOM_SELL_FEE_INCLUDES_VAT,
+    DEFAULT_CUSTOM_SELL_MARKET_PRICE_INCLUDES_VAT,
     DEFAULT_CUSTOM_SUPPLIER_NAME,
     DEFAULT_ELECTRIC_EFFICIENCY,
     DEFAULT_ENERGY_TAX,
@@ -442,6 +444,12 @@ class NLDayAheadPricesOptionsFlow(config_entries.OptionsFlow):
                 vol.Optional(
                     CONF_CUSTOM_SELL_FEE_INCLUDES_VAT,
                     default=data.get(CONF_CUSTOM_SELL_FEE_INCLUDES_VAT, DEFAULT_CUSTOM_SELL_FEE_INCLUDES_VAT),
+                ): bool,
+                vol.Optional(
+                    CONF_CUSTOM_SELL_MARKET_PRICE_INCLUDES_VAT,
+                    default=data.get(
+                        CONF_CUSTOM_SELL_MARKET_PRICE_INCLUDES_VAT, DEFAULT_CUSTOM_SELL_MARKET_PRICE_INCLUDES_VAT
+                    ),
                 ): bool,
             }
         )

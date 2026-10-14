@@ -126,6 +126,11 @@
                 "export_vat_included": {
                   "type": "boolean"
                 },
+                "export_market_vat_included": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Whether the supplier pays VAT on the market price of exported energy. Optional; defaults to true."
+                },
                 "settlement_resolution": {
                   "enum": [
                     "hourly",

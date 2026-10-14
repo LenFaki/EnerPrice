@@ -31,7 +31,14 @@ metadata continues to describe the supplier tariff valid now.
 ## Amounts and compatibility
 
 Import/export fees use EUR/kWh; fixed fees use EUR/month. `vat_included` applies
-to the import fee, and `export_vat_included` can override it for export. Monthly
+to the import fee, and `export_vat_included` can override it for export. Those
+flags only concern the fees. The optional `export_market_vat_included` (default
+`true`) states whether the supplier pays VAT on the *market price* of exported
+energy; when `false`, the sell price is `market - export_fee` instead of
+`market * (1 + vat) - export_fee`. Registries without the field remain valid.
+Released clients before this field reject unknown tariff fields, so the remote
+registry may only start using it in a later revision, after clients that accept
+it have been rolled out. Monthly
 fees are stored including VAT and are not added to per-kWh all-in prices.
 `feed_in_fee` and `imbalance_fee` retain the existing VAT-inclusive semantics.
 Negative export fees remain supported. The adapter populates existing v1/v2

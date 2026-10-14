@@ -154,8 +154,19 @@ covers efficiency loss and a safety margin.
 
 ### Solar Export Advisor
 
-The Export Advisor, Best Export Period, and Worst Export Period sensors use the
-supplier profile's export and feed-in fees. The
+The Export Advisor, Best Export Period, Worst Export Period, and Current Sell
+Price sensors use the supplier profile's export and feed-in fees. The sell price
+is the market price minus those fees. VAT is added to the market price unless
+the supplier pays feed-in excluding VAT (a registry tariff with
+`export_market_vat_included: false`, or a custom supplier with
+`custom_sell_market_price_includes_vat` turned off):
+
+```text
+sell = market_price * (1 + vat) - export_fee    # default
+sell = market_price - export_fee                # market price paid excluding VAT
+```
+
+The
 `nl_day_ahead_prices.find_best_export_window` service can also estimate export
 revenue for a specified amount of energy.
 
@@ -316,6 +327,8 @@ screen shows the custom tariff fields:
 - `custom_purchase_fee_includes_vat`
 - `custom_sell_fee_electricity`
 - `custom_sell_fee_includes_vat`
+- `custom_sell_market_price_includes_vat` (default on; turn off when your
+  supplier pays the market price for feed-in excluding VAT)
 
 Formula:
 
@@ -408,6 +421,7 @@ hard-coded inside Python. The compatibility profile exposes:
 - whether the purchase fee includes VAT
 - electricity sell fee
 - whether the sell fee includes VAT
+- whether the feed-in market price is paid including VAT
 - `last_verified`
 - `source_url`
 
@@ -444,6 +458,7 @@ custom purchase fee.
 Sensors:
 
 - Current Market Price
+- Current Sell Price
 - Next Market Price
 - Average Price Today
 - Average Price Tomorrow
@@ -519,6 +534,8 @@ Each price sensor exposes ApexCharts-friendly attributes:
 - `all_in_prices_today`
 - `all_in_prices`
 - `all_in_prices_tomorrow`
+- `sell_prices_today`
+- `sell_prices_tomorrow`
 - `raw_prices`
 - `raw_prices_today`
 - `raw_prices_tomorrow`
@@ -540,6 +557,7 @@ Each price sensor exposes ApexCharts-friendly attributes:
 - `next_interval_start`
 - `market_price`
 - `all_in_price`
+- `sell_price`
 - `rating_3_level`
 - `rating_5_level`
 - `trend`
@@ -549,6 +567,7 @@ Each price sensor exposes ApexCharts-friendly attributes:
 - `selected_supplier`
 - `supplier_purchase_fee`
 - `supplier_monthly_fee`
+- `supplier_export_fee`
 - `energy_tax`
 - `vat`
 - `supplier_profile_last_verified`
@@ -573,6 +592,8 @@ Price entries use this format:
 | `all_in_prices` | All available all-in prices |
 | `all_in_prices_today` | Today's all-in prices |
 | `all_in_prices_tomorrow` | Tomorrow's all-in prices |
+| `sell_prices_today` | Today's sell (export) prices |
+| `sell_prices_tomorrow` | Tomorrow's sell (export) prices |
 
 `all_in_prices` automatically includes tomorrow as soon as those prices are
 available. For an all-in series in **ct/kWh**, use this recommended generator

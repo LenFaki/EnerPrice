@@ -25,7 +25,9 @@ from .analysis.trend import trend_for_prices
 from .analysis.volatility import volatility
 from .calculations import (
     all_in_entries_for_supplier,
+    build_sell_price_attributes,
     calculate_monthly_fee,
+    calculate_sell_price,
     calculate_supplier_export_fee,
     calculate_supplier_fee,
 )
@@ -41,6 +43,7 @@ from .const import (
     CONF_CUSTOM_PURCHASE_FEE_INCLUDES_VAT,
     CONF_CUSTOM_SELL_FEE_ELECTRICITY,
     CONF_CUSTOM_SELL_FEE_INCLUDES_VAT,
+    CONF_CUSTOM_SELL_MARKET_PRICE_INCLUDES_VAT,
     CONF_CUSTOM_SUPPLIER_NAME,
     CONF_ELECTRIC_EFFICIENCY,
     CONF_ENERGY_TAX,
@@ -67,6 +70,7 @@ from .const import (
     DEFAULT_CUSTOM_PURCHASE_FEE_INCLUDES_VAT,
     DEFAULT_CUSTOM_SELL_FEE_ELECTRICITY,
     DEFAULT_CUSTOM_SELL_FEE_INCLUDES_VAT,
+    DEFAULT_CUSTOM_SELL_MARKET_PRICE_INCLUDES_VAT,
     DEFAULT_CUSTOM_SUPPLIER_NAME,
     DEFAULT_ELECTRIC_EFFICIENCY,
     DEFAULT_ENERGY_TAX,
@@ -113,6 +117,13 @@ class NLPriceSensorDescription(SensorEntityDescription):
 
 def _current_market(data: PriceData, now: datetime, entry: ConfigEntry) -> float | None:
     return current_price(data.result.prices, now)
+
+
+def _current_sell_price(data: PriceData, now: datetime, entry: ConfigEntry) -> float | None:
+    market = current_price(data.result.prices, now)
+    if market is None:
+        return None
+    return calculate_sell_price(market, _selected_supplier_profile(entry), _vat(entry))
 
 
 def _next_hour(data: PriceData, now: datetime, entry: ConfigEntry) -> float | None:
@@ -235,6 +246,9 @@ def _custom_supplier_profile(entry: ConfigEntry) -> SupplierProfile:
             options.get(CONF_CUSTOM_SELL_FEE_ELECTRICITY, DEFAULT_CUSTOM_SELL_FEE_ELECTRICITY)
         ),
         sell_fee_includes_vat=bool(options.get(CONF_CUSTOM_SELL_FEE_INCLUDES_VAT, DEFAULT_CUSTOM_SELL_FEE_INCLUDES_VAT)),
+        sell_market_price_includes_vat=bool(
+            options.get(CONF_CUSTOM_SELL_MARKET_PRICE_INCLUDES_VAT, DEFAULT_CUSTOM_SELL_MARKET_PRICE_INCLUDES_VAT)
+        ),
         last_verified=None,
         source_url=None,
         price_resolution=PRICE_RESOLUTION_HOURLY,
@@ -437,8 +451,8 @@ def _v2_data(
 
 def _sell_entries(data: PriceData, entry: ConfigEntry) -> list:
     profile = _selected_supplier_profile(entry)
-    fee = calculate_supplier_export_fee(profile, _vat(entry))
-    return [type(item)(item.time, item.price * (1 + _vat(entry)) - fee) for item in data.result.prices]
+    vat = _vat(entry)
+    return [type(item)(item.time, calculate_sell_price(item.price, profile, vat)) for item in data.result.prices]
 
 
 def _periods(data: PriceData, entry: ConfigEntry, runtime: dict[str, Any], *, peak: bool, prices: list | None = None):
@@ -515,6 +529,14 @@ SENSORS: tuple[NLPriceSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=4,
         value_fn=_current_market,
+    ),
+    NLPriceSensorDescription(
+        key="current_sell_price",
+        translation_key="current_sell_price",
+        native_unit_of_measurement=EUR_PER_KWH,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=4,
+        value_fn=_current_sell_price,
     ),
     NLPriceSensorDescription(
         key="next_hour_market_price",
@@ -836,6 +858,7 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
     _unrecorded_attributes = frozenset({
         "prices", "prices_today", "prices_tomorrow",
         "all_in_prices", "all_in_prices_today", "all_in_prices_tomorrow",
+        "sell_prices_today", "sell_prices_tomorrow",
         "raw_prices", "raw_prices_today", "raw_prices_tomorrow",
         "raw_today", "raw_tomorrow", "supplier_profile",
         "best_periods", "peak_periods",
@@ -925,6 +948,12 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
             **shared_price_attributes,
             "all_in_prices_today": all_in_attributes[:today_count],
             "all_in_prices_tomorrow": all_in_attributes[today_count:],
+            "sell_prices_today": build_sell_price_attributes(
+                data.result.prices_today, supplier_profile, _vat(self.entry)
+            ),
+            "sell_prices_tomorrow": build_sell_price_attributes(
+                data.result.prices_tomorrow, supplier_profile, _vat(self.entry)
+            ),
             "price_resolution": data.result.effective_price_resolution,
             "requested_price_resolution": data.result.requested_price_resolution,
             "effective_price_resolution": data.result.effective_price_resolution,
@@ -977,7 +1006,13 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
             "source_provider": data.result.provider,
             "market_price": current_entry.price if current_entry else None,
             "all_in_price": current_all_in,
+            "sell_price": (
+                calculate_sell_price(current_entry.price, supplier_profile, _vat(self.entry))
+                if current_entry
+                else None
+            ),
             "supplier_fee": round(calculate_supplier_fee(supplier_profile, _vat(self.entry)), 6),
+            "supplier_export_fee": round(calculate_supplier_export_fee(supplier_profile, _vat(self.entry)), 6),
             "rating_3_level": rating_3,
             "rating_5_level": rating_5,
             "trend": trend["trend"],

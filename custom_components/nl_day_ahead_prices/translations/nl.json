@@ -68,7 +68,8 @@
           "custom_purchase_fee_electricity": "Inkoopvergoeding stroom",
           "custom_purchase_fee_includes_vat": "Inkoopvergoeding is inclusief btw",
           "custom_sell_fee_electricity": "Verkoopvergoeding stroom",
-          "custom_sell_fee_includes_vat": "Verkoopvergoeding is inclusief btw"
+          "custom_sell_fee_includes_vat": "Verkoopvergoeding is inclusief btw",
+          "custom_sell_market_price_includes_vat": "Marktprijs voor teruglevering wordt inclusief btw uitbetaald"
         }
       },
       "smart_setup": {
@@ -445,6 +446,9 @@
       },
       "current_market_price": {
         "name": "Huidige Marktprijs"
+      },
+      "current_sell_price": {
+        "name": "Huidige Terugleverprijs"
       },
       "next_hour_market_price": {
         "name": "Volgende Marktprijs"

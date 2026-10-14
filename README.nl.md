@@ -243,8 +243,11 @@ dezelfde bronprijs. De originele bronprijzen blijven beschikbaar via
 
 ## Belangrijkste entiteiten
 
-EnerPrice levert onder andere huidige en volgende marktprijs, huidige en
-volgende all-in prijs, gemiddelden/minimum/maximum voor vandaag en morgen,
+EnerPrice levert onder andere huidige en volgende marktprijs, huidige
+terugleverprijs (marktprijs min de terugleverkosten van de leverancier; de
+marktprijs is inclusief btw, tenzij de leverancier teruglevering exclusief btw
+uitbetaalt, zoals bij een registertarief met `export_market_vat_included: false` of een eigen leverancier met
+`custom_sell_market_price_includes_vat` uitgeschakeld), huidige en volgende all-in prijs, gemiddelden/minimum/maximum voor vandaag en morgen,
 geselecteerde leverancier, effectief prijsinterval, provider, laatste
 succesvolle update, Price Advisor, Price Score, dagscore, terugleveradvies en
 Energy Opportunity.
@@ -358,7 +361,7 @@ Wanneer meerdere EnerPrice-configuraties geladen zijn, kan de Smart Energy Advis
 
 ## Attributen
 
-Prijsentiteiten bieden onder andere `prices`, `prices_today`, `prices_tomorrow`, `all_in_prices`, `all_in_prices_today`, `all_in_prices_tomorrow`, de overeenkomstige `raw_*` attributen, prijsresolutie, provider, fallbackstatus, cache-informatie, datacompleetheid, huidig/volgend interval, markt- en all-in prijs, beoordeling, trend, volatiliteit, dagstatistieken en leverancierstariefmetadata.
+Prijsentiteiten bieden onder andere `prices`, `prices_today`, `prices_tomorrow`, `all_in_prices`, `all_in_prices_today`, `all_in_prices_tomorrow`, `sell_prices_today`, `sell_prices_tomorrow`, de overeenkomstige `raw_*` attributen, prijsresolutie, provider, fallbackstatus, cache-informatie, datacompleetheid, huidig/volgend interval, markt- en all-in prijs, beoordeling, trend, volatiliteit, dagstatistieken en leverancierstariefmetadata.
 
 Prijsitems gebruiken steeds het formaat `{time, price}`, waarbij de prijs in EUR/kWh staat. Grote prijsarrays zijn bedoeld voor dashboards en analyse en worden waar passend buiten Recorder gehouden.
 
