@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from time import perf_counter
 from datetime import timedelta, timezone
+from time import perf_counter
 
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
