@@ -70,13 +70,15 @@ def daily_advice(coordinator, language=None):
         language = coordinator.hass.config.language
     now = dt_util.utcnow()
     prices = _cached_all_in_entries(coordinator, coordinator.data, coordinator.entry) if coordinator.data else []
-    # Absolute timestamps avoid Python's same-zone repeated-hour comparisons.
-    from .models import PriceEntry
-
-    utc_prices = [PriceEntry(item.time.astimezone(timezone.utc), item.price) for item in prices]
     signature = (id(prices), id(coordinator.daily_forecast.data), int(now.timestamp() // 60), repr(options), language)
     cache = getattr(coordinator, "analysis_cache", {})
     if cache.get("daily_advice", (None,))[0] != signature:
+        # Conversion is only needed on a cache miss. Home Assistant reads
+        # state and attributes separately, often within the same minute.
+        # Absolute timestamps avoid same-zone repeated-hour comparisons.
+        from .models import PriceEntry
+
+        utc_prices = [PriceEntry(item.time.astimezone(timezone.utc), item.price) for item in prices]
         result = build_smart_energy_advice(
             electricity_price=None, future_prices=utc_prices, now=now,
             flexible_load_power_w=options.get(CONF_FLEXIBLE_LOAD_POWER_W), language=language,
