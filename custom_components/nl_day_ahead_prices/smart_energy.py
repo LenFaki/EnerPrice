@@ -408,7 +408,8 @@ def _power_at(series, stamp):
 def _solar_load_energy(series, start, end, baseline, power, *, power_at=None):
     """Integrate bounded, piecewise-linear surplus; never bridge overnight gaps."""
     if power_at is None:
-        power_at = lambda stamp: _power_at(series, stamp)
+        def power_at(stamp):
+            return _power_at(series, stamp)
     knots = {start, end}
     for points in series:
         first = bisect_right(points, (start, float("inf")))

@@ -516,6 +516,7 @@ def test_daily_solar_interpolation_reuses_forecast_boundaries(monkeypatch):
 def test_solar_integral_cached_and_uncached_are_identical():
     """Caching cannot change interpolation, clipping, or missing-gap handling."""
     from functools import cache
+
     from custom_components.nl_day_ahead_prices.smart_energy import _power_at
 
     series = [[(0, 0), (900, 2000), (1800, 600), (2700, 2400), (3600, 0)]]
