@@ -853,6 +853,8 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
         "raw_prices", "raw_prices_today", "raw_prices_tomorrow",
         "raw_today", "raw_tomorrow", "supplier_profile",
         "best_periods", "peak_periods",
+        "cheapest_15_minutes", "cheapest_30_minutes", "cheapest_45_minutes",
+        "cheapest_1_hour", "cheapest_2_hours", "cheapest_3_hours", "cheapest_4_hours",
     })
 
     def __init__(
