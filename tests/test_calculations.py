@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 import pytest
 
 from custom_components.nl_day_ahead_prices.calculations import (
-    build_sell_price_attributes,
     calculate_sell_price,
     export_entries_for_supplier,
 )
@@ -94,13 +93,11 @@ def test_sell_price_without_profile_is_market_price_incl_vat() -> None:
     assert calculate_sell_price(0.1, None, 0.21) == pytest.approx(0.1 * 1.21)
 
 
-def test_build_sell_price_attributes() -> None:
+def test_export_entries_without_fee_keep_only_market_component() -> None:
     prices = [PriceEntry(datetime(2026, 7, 2, 10, tzinfo=timezone.utc), 0.1)]
-    profile = _supplier_profile(purchase_fee_export=0.02)
+    profile = _supplier_profile(key="custom", purchase_fee_export=0.02, sell_market_price_includes_vat=False)
 
-    result = build_sell_price_attributes(prices, profile, 0.21)
-
-    assert result == [{"time": "2026-07-02T10:00:00+00:00", "price": round(0.1 * 1.21 - 0.02, 6)}]
+    assert export_entries_for_supplier(prices, profile, 0.21, include_fee=False)[0].price == pytest.approx(0.1)
 
 
 def test_sell_price_without_vat_on_market_price() -> None:

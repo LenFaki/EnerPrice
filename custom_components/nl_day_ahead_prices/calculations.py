@@ -36,7 +36,9 @@ def build_all_in_price_attributes_for_supplier(
     return [item.as_attribute() for item in all_in_entries_for_supplier(prices, energy_tax, supplier_profile, vat)]
 
 
-def export_entries_for_supplier(prices: list[PriceEntry], supplier_profile: SupplierProfile, vat: float) -> list[PriceEntry]:
+def export_entries_for_supplier(
+    prices: list[PriceEntry], supplier_profile: SupplierProfile, vat: float, *, include_fee: bool = True,
+) -> list[PriceEntry]:
     """Apply existing export-fee semantics at each interval's local tariff date."""
     profiles = {}
     result = []
@@ -46,7 +48,11 @@ def export_entries_for_supplier(prices: list[PriceEntry], supplier_profile: Supp
             profiles[day] = supplier_profile
             if supplier_profile.key != "custom" and supplier_profile.registry_source != "custom":
                 profiles[day] = get_supplier_tariff(supplier_profile.key, day, mode=supplier_profile.tariff_registry_mode) or supplier_profile
-        result.append(PriceEntry(item.time, calculate_sell_price(item.price, profiles[day], vat)))
+        if include_fee:
+            price = calculate_sell_price(item.price, profiles[day], vat)
+        else:
+            price = calculate_sell_market_price(item.price, profiles[day], vat)
+        result.append(PriceEntry(item.time, price))
     return result
 
 
@@ -124,21 +130,6 @@ def calculate_sell_price(
     return calculate_sell_market_price(market_price, supplier_profile, vat) - calculate_supplier_export_fee(
         supplier_profile, vat
     )
-
-
-def build_sell_price_attributes(
-    prices: list[Any],
-    supplier_profile: SupplierProfile | dict[str, Any] | None,
-    vat: float,
-) -> list[dict[str, Any]]:
-    """Build ApexCharts-friendly sell (export) price attributes."""
-    return [
-        {
-            "time": price.time.isoformat(),
-            "price": round(calculate_sell_price(price.price, supplier_profile, vat), 6),
-        }
-        for price in prices
-    ]
 
 
 def normalize_supplier_profile(profile: SupplierProfile | dict[str, Any] | None) -> SupplierProfile | None:

@@ -25,11 +25,10 @@ from .analysis.trend import trend_for_prices
 from .analysis.volatility import volatility
 from .calculations import (
     all_in_entries_for_supplier,
-    build_sell_price_attributes,
     calculate_monthly_fee,
-    calculate_sell_price,
     calculate_supplier_export_fee,
     calculate_supplier_fee,
+    export_entries_for_supplier,
 )
 from .const import (
     CONF_ADVICE_LANGUAGE,
@@ -120,10 +119,7 @@ def _current_market(data: PriceData, now: datetime, entry: ConfigEntry) -> float
 
 
 def _current_sell_price(data: PriceData, now: datetime, entry: ConfigEntry) -> float | None:
-    market = current_price(data.result.prices, now)
-    if market is None:
-        return None
-    return calculate_sell_price(market, _selected_supplier_profile(entry), _vat(entry))
+    return current_price(_sell_entries(data, entry), now)
 
 
 def _next_hour(data: PriceData, now: datetime, entry: ConfigEntry) -> float | None:
@@ -450,9 +446,8 @@ def _v2_data(
 
 
 def _sell_entries(data: PriceData, entry: ConfigEntry) -> list:
-    profile = _selected_supplier_profile(entry)
-    vat = _vat(entry)
-    return [type(item)(item.time, calculate_sell_price(item.price, profile, vat)) for item in data.result.prices]
+    """Use the same interval-date tariff selection as the Daily Advisor export prices."""
+    return export_entries_for_supplier(data.result.prices, _selected_supplier_profile(entry), _vat(entry))
 
 
 def _periods(data: PriceData, entry: ConfigEntry, runtime: dict[str, Any], *, peak: bool, prices: list | None = None):
@@ -958,16 +953,14 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
             },
         )
         all_in_attributes = shared_price_attributes["all_in_prices"]
+        sell_entries = _cached_value(self.coordinator, "sell_entries", lambda: _sell_entries(data, self.entry))
+        sell_attributes = [entry.as_attribute() for entry in sell_entries]
         base = {
             **shared_price_attributes,
             "all_in_prices_today": all_in_attributes[:today_count],
             "all_in_prices_tomorrow": all_in_attributes[today_count:],
-            "sell_prices_today": build_sell_price_attributes(
-                data.result.prices_today, supplier_profile, _vat(self.entry)
-            ),
-            "sell_prices_tomorrow": build_sell_price_attributes(
-                data.result.prices_tomorrow, supplier_profile, _vat(self.entry)
-            ),
+            "sell_prices_today": sell_attributes[:today_count],
+            "sell_prices_tomorrow": sell_attributes[today_count:],
             "price_resolution": data.result.effective_price_resolution,
             "requested_price_resolution": data.result.requested_price_resolution,
             "effective_price_resolution": data.result.effective_price_resolution,
@@ -1020,11 +1013,7 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
             "source_provider": data.result.provider,
             "market_price": current_entry.price if current_entry else None,
             "all_in_price": current_all_in,
-            "sell_price": (
-                calculate_sell_price(current_entry.price, supplier_profile, _vat(self.entry))
-                if current_entry
-                else None
-            ),
+            "sell_price": current_price(sell_entries, now),
             "supplier_fee": round(calculate_supplier_fee(supplier_profile, _vat(self.entry)), 6),
             "supplier_export_fee": round(calculate_supplier_export_fee(supplier_profile, _vat(self.entry)), 6),
             "rating_3_level": rating_3,
