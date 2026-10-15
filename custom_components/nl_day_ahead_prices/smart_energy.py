@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from bisect import bisect_right
 from datetime import datetime, time, timedelta, timezone
+from functools import cache
 from math import ceil, isfinite
 from typing import Any
 
@@ -238,6 +239,9 @@ def _daily_advice(prices, now, context, power_w, language):
     export_map = {item.time.astimezone(timezone.utc): item.price for item in context.get("export_prices", []) if isfinite(item.price)}
     solar_days = {day["date"]: day for day in forecast.get("days", [])}
     series = _power_series(forecast)
+    # Forecast knots and interval boundaries recur across chart and solar integration.
+    # Keep the memoization scoped to this calculation: no stale forecast values.
+    power_at = cache(lambda stamp: _power_at(series, stamp))
     measurements = {item["role"]: item for item in forecast.get("measurements", []) if item.get("kind") == "measured"}
     grid = measurements.get("grid_power", {}).get("value")
     solar = measurements.get("solar_power", {}).get("value")
@@ -277,7 +281,7 @@ def _daily_advice(prices, now, context, power_w, language):
                  "expected_intervals": len(stamps), "solar_energy_kwh": solar_days.get(day.isoformat(), {}).get("energy_kwh"),
                  "solar_status": solar_days.get(day.isoformat(), {}).get("status", "missing"), "window": None}
         for stamp in stamps:
-            solar_w = _power_at(series, stamp.timestamp())
+            solar_w = power_at(stamp.timestamp())
             chart.append({"time": stamp.isoformat(), "price": price_map.get(stamp), "solar_kw": solar_w / 1000 if solar_w is not None else None})
         # Never optimize across a missing price interval or extend the last known price.
         complete = future and all(stamp in price_map for stamp in future)
@@ -294,7 +298,7 @@ def _daily_advice(prices, now, context, power_w, language):
                 incomplete_solar_interval = False
                 solar_times = set()
                 for item in entries:
-                    own = _solar_load_energy(series, item.time.timestamp(), (item.time + step).timestamp(), baseline, power_w)
+                    own = _solar_load_energy(series, item.time.timestamp(), (item.time + step).timestamp(), baseline, power_w, power_at=power_at)
                     if own is None:
                         incomplete_solar_interval = True
                         continue
@@ -401,8 +405,11 @@ def _power_at(series, stamp):
     return total
 
 
-def _solar_load_energy(series, start, end, baseline, power):
+def _solar_load_energy(series, start, end, baseline, power, *, power_at=None):
     """Integrate bounded, piecewise-linear surplus; never bridge overnight gaps."""
+    if power_at is None:
+        def power_at(stamp):
+            return _power_at(series, stamp)
     knots = {start, end}
     for points in series:
         first = bisect_right(points, (start, float("inf")))
@@ -411,7 +418,7 @@ def _solar_load_energy(series, start, end, baseline, power):
     knots = sorted(knots)
     energy = 0.0
     for left, right in zip(knots, knots[1:], strict=False):
-        values = [_power_at(series, stamp) for stamp in (left, (left + right) / 2, right)]
+        values = [power_at(stamp) for stamp in (left, (left + right) / 2, right)]
         if any(value is None for value in values):
             return None
         first, _, last = values
