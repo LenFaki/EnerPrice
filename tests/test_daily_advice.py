@@ -491,3 +491,37 @@ def test_daily_advice_profiling_warns_only_on_slow_cache_misses(advice_runtime, 
         assert warning.call_count == 1
         assert "recomputation took" in warning.call_args.args[0]
         assert warning.call_args.args[1] == pytest.approx(elapsed * 1000)
+
+
+def test_daily_solar_interpolation_reuses_forecast_boundaries(monkeypatch):
+    """Repeated chart/solar timestamps should only interpolate once per advice."""
+    import custom_components.nl_day_ahead_prices.smart_energy as smart_energy
+
+    prices = prices_for_day(minutes=15)
+    ctx = context(prices, minutes=15)
+    original = smart_energy._power_at
+    calls = []
+
+    def tracked(series, stamp):
+        calls.append(stamp)
+        return original(series, stamp)
+
+    monkeypatch.setattr(smart_energy, "_power_at", tracked)
+    result = daily(prices, ctx)
+    assert result["solar_scenario_available"]
+    assert len(calls) == len(set(calls))
+    assert len(calls) > 0
+
+
+def test_solar_integral_cached_and_uncached_are_identical():
+    """Caching cannot change interpolation, clipping, or missing-gap handling."""
+    from functools import cache
+    from custom_components.nl_day_ahead_prices.smart_energy import _power_at
+
+    series = [[(0, 0), (900, 2000), (1800, 600), (2700, 2400), (3600, 0)]]
+    cached = cache(lambda stamp: _power_at(series, stamp))
+    for baseline, power in [(0, 1000), (500, 1000), (1000, 2000)]:
+        assert _solar_load_energy(series, 0, 3600, baseline, power) == _solar_load_energy(
+            series, 0, 3600, baseline, power, power_at=cached
+        )
+    assert _solar_load_energy(series, 3600, 4500, 500, 1000, power_at=cached) is None
