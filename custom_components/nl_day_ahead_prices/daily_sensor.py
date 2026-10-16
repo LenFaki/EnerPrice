@@ -5,11 +5,10 @@ import logging
 from datetime import datetime, timezone
 from functools import partial
 
-from homeassistant.util import dt as dt_util
-
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.const import EntityCategory, UnitOfEnergy
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from .const import CONF_ADVICE_LANGUAGE, CONF_FLEXIBLE_LOAD_POWER_W, DOMAIN
 
