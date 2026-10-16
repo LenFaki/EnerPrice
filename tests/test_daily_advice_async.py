@@ -4,13 +4,14 @@ import asyncio
 import importlib.util
 import sys
 
-import custom_components.nl_day_ahead_prices as integration_package
 from datetime import datetime, timezone
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
+
+import custom_components.nl_day_ahead_prices as integration_package
 
 # The lightweight CI suite does not install Home Assistant. Stub only the
 # entity types needed to import the worker; exercise the real worker logic.
@@ -42,7 +43,7 @@ with patch.dict(sys.modules, {
     _AsyncDailyAdvice = module._AsyncDailyAdvice
 
 # patch() resolves package attributes, not only sys.modules entries.
-setattr(integration_package, "daily_advisor", sys.modules["custom_components.nl_day_ahead_prices.daily_advisor"])
+integration_package.daily_advisor = sys.modules["custom_components.nl_day_ahead_prices.daily_advisor"]
 
 
 def make_worker():
