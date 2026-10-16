@@ -32,7 +32,7 @@ with patch.dict(sys.modules, {
 }):
     sys.modules["custom_components.nl_day_ahead_prices.daily_advisor"].advisor_context = lambda coordinator: None
     spec = importlib.util.spec_from_file_location(
-        "_enerprice_daily_sensor_test",
+        "custom_components.nl_day_ahead_prices.daily_sensor",
         Path(__file__).parents[1] / "custom_components/nl_day_ahead_prices/daily_sensor.py",
     )
     module = importlib.util.module_from_spec(spec)
