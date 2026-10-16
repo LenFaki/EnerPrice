@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.6.6 - 2026-10-16
+
+### Fixed
+- Treat a provider response containing JSON `null` as an empty response instead of passing it to price parsers and raising an AttributeError.
+- Retry an empty JSON response according to the existing provider retry policy; report a provider error when all attempts fail.
+- Add regression tests for successful retry and exhausted retries (contributed by hvandonge, PR #66).
+
+### Compatibility
+- No changes to existing entity IDs or configuration are required.
+
 ## 2.6.5 - 2026-10-16
 
 ### Added
