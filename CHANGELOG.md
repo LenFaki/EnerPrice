@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.6.5 - 2026-10-16
+
+### Added
+- Add a Current Sell Price sensor and an optional export-market VAT flag for supported supplier pricing.
+- Add more granular Daily Energy Advisor context timing diagnostics to identify slow snapshot and export-price computations.
+
+### Improved
+- Cache and reuse sell-price entries between sensor state and attribute reads.
+- Keep export tariff calculations consistent across supplier tariff effective-date boundaries, with regression coverage.
+
+### Compatibility
+- Existing configuration and entity IDs remain in place; new export VAT behavior is optional.
+- Diagnostics help investigate slow Daily Energy Advice updates but do not by themselves remove the underlying delay.
+
 ## 2.6.4 - 2026-10-14
 
 ### Performance
