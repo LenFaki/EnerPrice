@@ -53,6 +53,7 @@ class SupplierProfile:
     registry_source: str = "legacy"
     registry_revision: int | None = None
     tariff_registry_mode: str = "automatic"
+    sell_market_price_includes_vat: bool = True
 
     def __post_init__(self) -> None:
         """Populate v2 aliases for profiles constructed with the v1 schema."""
@@ -110,6 +111,7 @@ def normalize_supplier_profile(profile: dict[str, Any], key: str = "custom") -> 
     purchase_fee_includes_vat = bool(profile.get("purchase_fee_includes_vat", True))
     sell_fee = float(profile.get("purchase_fee_export", profile.get("sell_fee_electricity", 0.0)))
     sell_fee_includes_vat = bool(profile.get("sell_fee_includes_vat", True))
+    sell_market_price_includes_vat = bool(profile.get("sell_market_price_includes_vat", True))
     price_resolution = normalize_profile_price_resolution(
         profile.get(
             "price_resolution",
@@ -174,6 +176,7 @@ def normalize_supplier_profile(profile: dict[str, Any], key: str = "custom") -> 
         feed_in_fee=feed_in_fee,
         imbalance_fee=imbalance_fee,
         notes=str(notes) if notes is not None else None,
+        sell_market_price_includes_vat=sell_market_price_includes_vat,
     )
 
 
@@ -188,6 +191,7 @@ def supplier_profile_to_dict(profile: SupplierProfile) -> dict[str, Any]:
         "purchase_fee_includes_vat": profile.purchase_fee_includes_vat,
         "sell_fee_electricity": profile.sell_fee_electricity,
         "sell_fee_includes_vat": profile.sell_fee_includes_vat,
+        "sell_market_price_includes_vat": profile.sell_market_price_includes_vat,
         "price_resolution": profile.price_resolution,
         "price_resolution_changes": profile.price_resolution_changes or [],
         "default_price_resolution_before_change": profile.default_price_resolution_before_change,

@@ -52,6 +52,7 @@ def tariff_status(profile, now, manager=None):
         "fixed_monthly_fee_electricity": profile.fixed_monthly_fee_electricity,
         "vat_included": profile.purchase_fee_includes_vat,
         "export_vat_included": profile.sell_fee_includes_vat,
+        "export_market_vat_included": profile.sell_market_price_includes_vat,
         "settlement_resolution": metadata["supplier_settlement_resolution"],
         "valid_from": profile.valid_from,
         "valid_until": profile.valid_until,
