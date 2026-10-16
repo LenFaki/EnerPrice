@@ -1,12 +1,41 @@
 """Regression coverage for asynchronous Daily Advisor sensor calculations."""
 
 import asyncio
-from types import SimpleNamespace
+import importlib.util
+import sys
+from pathlib import Path
+from types import ModuleType, SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
 
-from custom_components.nl_day_ahead_prices.daily_sensor import _AsyncDailyAdvice
+# The lightweight CI suite does not install Home Assistant. Stub only the
+# entity types needed to import the worker; exercise the real worker logic.
+sensor_module = ModuleType("homeassistant.components.sensor")
+sensor_module.SensorDeviceClass = SimpleNamespace(ENUM="enum", TIMESTAMP="timestamp", ENERGY="energy")
+sensor_module.SensorEntity = type("SensorEntity", (), {})
+const_module = ModuleType("homeassistant.const")
+const_module.EntityCategory = SimpleNamespace(DIAGNOSTIC="diagnostic")
+const_module.UnitOfEnergy = SimpleNamespace(KILO_WATT_HOUR="kWh")
+coordinator_module = ModuleType("homeassistant.helpers.update_coordinator")
+coordinator_module.CoordinatorEntity = type("CoordinatorEntity", (), {})
+util_module = ModuleType("homeassistant.util")
+from custom_components.nl_day_ahead_prices import daily_advisor as advisor_module
+util_module.dt = advisor_module.dt_util
+
+with patch.dict(sys.modules, {
+    "homeassistant.components.sensor": sensor_module,
+    "homeassistant.const": const_module,
+    "homeassistant.helpers.update_coordinator": coordinator_module,
+    "homeassistant.util": util_module,
+}):
+    spec = importlib.util.spec_from_file_location(
+        "_enerprice_daily_sensor_test",
+        Path(__file__).parents[1] / "custom_components/nl_day_ahead_prices/daily_sensor.py",
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    _AsyncDailyAdvice = module._AsyncDailyAdvice
 
 
 def make_worker():
