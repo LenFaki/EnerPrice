@@ -3,6 +3,8 @@
 import asyncio
 import importlib.util
 import sys
+
+import custom_components.nl_day_ahead_prices as integration_package
 from datetime import datetime, timezone
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -38,6 +40,9 @@ with patch.dict(sys.modules, {
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     _AsyncDailyAdvice = module._AsyncDailyAdvice
+
+# patch() resolves package attributes, not only sys.modules entries.
+setattr(integration_package, "daily_advisor", sys.modules["custom_components.nl_day_ahead_prices.daily_advisor"])
 
 
 def make_worker():
