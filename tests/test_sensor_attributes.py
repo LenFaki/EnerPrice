@@ -230,6 +230,138 @@ def test_tibber_tomorrow_fee_changes_before_midnight(sensor_module, monkeypatch,
     assert sensor_module._next_hour_all_in(sensor.coordinator.data, before_midnight, sensor.entry) == pytest.approx(base + tomorrow_fee)
 
 
+AMSTERDAM_ZONE = ZoneInfo("Europe/Amsterdam")
+BOUNDARY_PUBLISHED = datetime(2026, 8, 31, 15, tzinfo=AMSTERDAM_ZONE)
+BEFORE_BOUNDARY = datetime(2026, 8, 31, 23, 30, tzinfo=AMSTERDAM_ZONE)
+AFTER_BOUNDARY = datetime(2026, 9, 1, 0, 30, tzinfo=AMSTERDAM_ZONE)
+CUSTOM_SELL_OPTIONS = {"selected_supplier": "custom", "custom_sell_fee_electricity": 0.03,
+                       "custom_sell_fee_includes_vat": True}
+
+
+def boundary_runtime(sensor_module, monkeypatch, minutes, options):
+    """Today/tomorrow prices straddling the tariff boundary, plus the real Daily Advisor context."""
+    from tests.test_daily_forecast import load_adapter
+
+    clock = SimpleNamespace(now=BOUNDARY_PUBLISHED)
+    monkeypatch.setattr(sensor_module.dt_util, "now", lambda: clock.now)
+    price_sensor = make_sensor(sensor_module, day_prices("2026-08-31", minutes), extended=True)
+    coordinator, entry = price_sensor.coordinator, price_sensor.entry
+    coordinator.data.result.prices_tomorrow = day_prices("2026-09-01", minutes)
+    coordinator.hass = SimpleNamespace(config=SimpleNamespace(language="en"))
+    coordinator.cached_analysis = lambda key, factory: factory()
+    coordinator.entry = entry
+    entry.options = dict(options)
+    daily_advisor = load_adapter(monkeypatch).module
+    # The Daily Advisor reads the supplier profile and VAT from the sensor module under test.
+    monkeypatch.setitem(sys.modules, "custom_components.nl_day_ahead_prices.sensor", sensor_module)
+
+    def entity(key):
+        description = next(item for item in sensor_module.SENSORS if item.key == key)
+        return sensor_module.NLDayAheadPriceSensor(coordinator, entry, description)
+
+    def advisor_exports():
+        context = daily_advisor.advisor_context(
+            SimpleNamespace(daily_forecast=SimpleNamespace(snapshot=dict), entry=entry, data=coordinator.data)
+        )
+        return context["export_prices"]
+
+    return SimpleNamespace(clock=clock, coordinator=coordinator, entry=entry, price_sensor=price_sensor,
+                           entity=entity, advisor_exports=advisor_exports)
+
+
+def current_sell_outputs(runtime, when):
+    """Every public current sell price at one moment, keyed by output."""
+    from custom_components.nl_day_ahead_prices.models import current_price
+
+    runtime.clock.now = when
+    attrs = runtime.price_sensor.extra_state_attributes
+    series = [PriceEntry(datetime.fromisoformat(item["time"]), item["price"])
+              for item in attrs["sell_prices_today"] + attrs["sell_prices_tomorrow"]]
+    return {
+        "current_sell_price_sensor": runtime.entity("current_sell_price").native_value,
+        "export_advisor": runtime.entity("export_advisor").extra_state_attributes["current_sell_price"],
+        "sell_price_attribute": attrs["sell_price"],
+        "sell_prices_series": current_price(series, when),
+        "daily_advisor_export_prices": current_price(runtime.advisor_exports(), when),
+    }
+
+
+@pytest.mark.parametrize("minutes", [15, 60])
+@pytest.mark.parametrize("custom", [False, True])
+def test_sell_outputs_agree_with_export_advisor_across_tariff_boundary(sensor_module, monkeypatch, minutes, custom):
+    """All sell outputs use the tariff of each interval's own date, like the export advisors."""
+    runtime = boundary_runtime(sensor_module, monkeypatch, minutes, CUSTOM_SELL_OPTIONS if custom else {"selected_supplier": "tibber"})
+    market = 0.1 * 1.21
+    # Custom fees never follow the registry.
+    today_sell, tomorrow_sell = (market - 0.03, market - 0.03) if custom else (market - 0.0248, market - 0.018)
+
+    # Tomorrow's prices are published while "now" is still before the boundary.
+    attrs = runtime.price_sensor.extra_state_attributes
+    assert all(item["price"] == pytest.approx(today_sell) for item in attrs["sell_prices_today"])
+    assert all(item["price"] == pytest.approx(tomorrow_sell) for item in attrs["sell_prices_tomorrow"])
+    assert attrs["sell_prices_tomorrow"][0]["time"] == "2026-09-01T00:00:00+02:00"
+    assert attrs["sell_prices_today"] + attrs["sell_prices_tomorrow"] == [
+        item.as_attribute() for item in runtime.advisor_exports()
+    ]
+    best_export = runtime.entity("best_export_period").extra_state_attributes["price"]
+    assert best_export == pytest.approx(max(today_sell, tomorrow_sell))
+
+    for when, expected in ((BEFORE_BOUNDARY, today_sell), (AFTER_BOUNDARY, tomorrow_sell)):
+        outputs = current_sell_outputs(runtime, when)
+        assert outputs == {key: pytest.approx(expected) for key in outputs}, when
+
+
+def test_sell_outputs_follow_market_vat_flag_across_tariff_boundary(sensor_module, monkeypatch):
+    """A tariff that stops paying VAT on the export market price applies from its own date only."""
+    candidate = json.loads((Path(__file__).parents[1] / "registry/supplier_tariffs.json").read_text())
+    candidate["revision"] = 2
+    september = next(item for item in candidate["suppliers"]["tibber"]["tariffs"] if item["valid_from"] == "2026-09-01")
+    september["export_market_vat_included"] = False
+    activate_remote_registry(parse_remote_registry(candidate))
+    try:
+        runtime = boundary_runtime(sensor_module, monkeypatch, 60, {"selected_supplier": "tibber"})
+        attrs = runtime.price_sensor.extra_state_attributes
+        assert all(item["price"] == pytest.approx(0.1 * 1.21 - 0.0248) for item in attrs["sell_prices_today"])
+        assert all(item["price"] == pytest.approx(0.1 - 0.018) for item in attrs["sell_prices_tomorrow"])
+        for when, expected in ((BEFORE_BOUNDARY, 0.1 * 1.21 - 0.0248), (AFTER_BOUNDARY, 0.1 - 0.018)):
+            outputs = current_sell_outputs(runtime, when)
+            assert outputs == {key: pytest.approx(expected) for key in outputs}, when
+    finally:
+        activate_remote_registry(None)
+
+
+@pytest.mark.parametrize("include_fee", [True, False])
+async def test_export_window_service_uses_interval_date_tariff(sensor_module, monkeypatch, include_fee):
+    """find_best_export_window agrees with the Daily Advisor export prices across the boundary."""
+    from custom_components.nl_day_ahead_prices.const import DOMAIN
+    from tests.test_registry_ux import _load_services_v2_for_smart_defaults
+    from tests.test_service_lifecycle import FakeServices
+
+    runtime = boundary_runtime(sensor_module, monkeypatch, 60, {"selected_supplier": "tibber"})
+    services = _load_services_v2_for_smart_defaults(monkeypatch)
+    # The loader installs a sensor stub; services and the Daily Advisor must share the real supplier lookup.
+    monkeypatch.setitem(sys.modules, "custom_components.nl_day_ahead_prices.sensor", sensor_module)
+    monkeypatch.setattr(services, "_selected_supplier_profile", sensor_module._selected_supplier_profile)
+    monkeypatch.setattr(services, "_vat", sensor_module._vat)
+    hass = SimpleNamespace(services=FakeServices(), data={DOMAIN: {runtime.entry.entry_id: runtime.coordinator}},
+                           config=SimpleNamespace(language="en"))
+    services.async_register_v2_services(hass)
+    handler, _ = hass.services.registered[(DOMAIN, "find_best_export_window")]
+
+    prices = services._prices(runtime.coordinator, "sell", include_fee)
+    result = await handler(SimpleNamespace(service="find_best_export_window", data={
+        "price_type": "sell", "include_supplier_sell_fee": include_fee, "duration_minutes": 60,
+    }))
+    if include_fee:
+        assert prices == runtime.advisor_exports()
+        # Tomorrow's lower export fee makes it the best window.
+        assert result["best_export_start"].startswith("2026-09-01T00:00")
+        assert result["average_sell_price"] == pytest.approx(0.1 * 1.21 - 0.018)
+    else:
+        assert all(item.price == pytest.approx(0.1 * 1.21) for item in prices)
+        assert result["average_sell_price"] == pytest.approx(0.1 * 1.21)
+
+
 def test_average_all_in_sensor_keeps_statistics_unit(sensor_module):
     description = next(item for item in sensor_module.SENSORS if item.key == "average_all_in_price_today")
     assert description.native_unit_of_measurement == "EUR/kWh"
@@ -301,6 +433,45 @@ def test_trajectory_reuses_all_in_and_trend_within_coordinator_cycle(sensor_modu
     assert attrs["trend"] is not None
     assert all_in_calls == 1
     assert trend_calls == 1
+
+
+def test_sell_series_is_built_once_per_coordinator_cycle(sensor_module, monkeypatch):
+    """The sell price state, chart attributes and export advisor share one sell series."""
+    price_sensor = make_sensor(sensor_module, day_prices("2026-09-08", 15), extended=True)
+    coordinator, entry = price_sensor.coordinator, price_sensor.entry
+    coordinator.hass = SimpleNamespace(config=SimpleNamespace(language="en"))
+    cache = {}
+    def cached_analysis(key, factory):
+        if key not in cache:
+            cache[key] = factory()
+        return cache[key]
+    coordinator.cached_analysis = cached_analysis
+
+    def entity(key):
+        description = next(item for item in sensor_module.SENSORS if item.key == key)
+        return sensor_module.NLDayAheadPriceSensor(coordinator, entry, description)
+
+    original = sensor_module._sell_entries
+    calls = 0
+    def counted(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return original(*args, **kwargs)
+    monkeypatch.setattr(sensor_module, "_sell_entries", counted)
+
+    sell_sensor, export_advisor = entity("current_sell_price"), entity("export_advisor")
+    for _ in range(3):
+        state = sell_sensor.native_value
+        assert state is not None
+    attrs = price_sensor.extra_state_attributes
+    assert export_advisor.extra_state_attributes["current_sell_price"] == pytest.approx(state)
+    assert attrs["sell_price"] == pytest.approx(state)
+    assert calls == 1
+
+    # Clearing the cache (new data, interval boundary, option change) rebuilds the series.
+    cache.clear()
+    assert sell_sensor.native_value == state
+    assert calls == 2
 
 
 def test_rating_does_not_calculate_trend(sensor_module, monkeypatch):
