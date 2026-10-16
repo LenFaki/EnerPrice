@@ -1,54 +1,59 @@
-"""Regression coverage for asynchronous Daily Advisor sensor calculations."""
+"""Async Daily Advisor worker regressions without a Home Assistant runtime."""
 
+import ast
 import asyncio
-import importlib.util
-import sys
+import logging
 from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
 
-import custom_components.nl_day_ahead_prices as integration_package
+from custom_components.nl_day_ahead_prices import const
 
-# The lightweight CI suite does not install Home Assistant. Stub only the
-# entity types needed to import the worker; exercise the real worker logic.
-sensor_module = ModuleType("homeassistant.components.sensor")
-sensor_module.SensorDeviceClass = SimpleNamespace(ENUM="enum", TIMESTAMP="timestamp", ENERGY="energy")
-sensor_module.SensorEntity = type("SensorEntity", (), {})
-const_module = ModuleType("homeassistant.const")
-const_module.EntityCategory = SimpleNamespace(DIAGNOSTIC="diagnostic")
-const_module.UnitOfEnergy = SimpleNamespace(KILO_WATT_HOUR="kWh")
-coordinator_module = ModuleType("homeassistant.helpers.update_coordinator")
-coordinator_module.CoordinatorEntity = type("CoordinatorEntity", (), {})
-util_module = ModuleType("homeassistant.util")
-util_module.dt = SimpleNamespace(utcnow=lambda: datetime.now(timezone.utc))
+PACKAGE = "custom_components.nl_day_ahead_prices"
+SOURCE = Path(__file__).parents[1] / "custom_components/nl_day_ahead_prices/daily_sensor.py"
+tree = ast.parse(SOURCE.read_text())
+worker_node = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "_AsyncDailyAdvice")
+namespace = {
+    "__name__": f"{PACKAGE}.daily_sensor",
+    "__package__": PACKAGE,
+    "asyncio": asyncio,
+    "partial": partial,
+    "timezone": timezone,
+    "_LOGGER": logging.getLogger(__name__),
+    "dt_util": SimpleNamespace(utcnow=lambda: datetime.now(timezone.utc)),
+    "CONF_ADVICE_LANGUAGE": const.CONF_ADVICE_LANGUAGE,
+    "CONF_FLEXIBLE_LOAD_POWER_W": const.CONF_FLEXIBLE_LOAD_POWER_W,
+}
+exec(compile(ast.Module(body=[worker_node], type_ignores=[]), str(SOURCE), "exec"), namespace)
+_AsyncDailyAdvice = namespace["_AsyncDailyAdvice"]
 
-with patch.dict(sys.modules, {
-    "homeassistant.components.sensor": sensor_module,
-    "homeassistant.const": const_module,
-    "homeassistant.helpers.update_coordinator": coordinator_module,
-    "homeassistant.util": util_module,
-    "custom_components.nl_day_ahead_prices.daily_advisor": ModuleType("custom_components.nl_day_ahead_prices.daily_advisor"),
-}):
-    sys.modules["custom_components.nl_day_ahead_prices.daily_advisor"].advisor_context = lambda coordinator: None
-    spec = importlib.util.spec_from_file_location(
-        "custom_components.nl_day_ahead_prices.daily_sensor",
-        Path(__file__).parents[1] / "custom_components/nl_day_ahead_prices/daily_sensor.py",
-    )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    _AsyncDailyAdvice = module._AsyncDailyAdvice
 
-# patch() resolves package attributes, not only sys.modules entries.
-integration_package.daily_advisor = ModuleType("custom_components.nl_day_ahead_prices.daily_advisor")
-integration_package.daily_advisor.advisor_context = lambda coordinator: None
+@pytest.fixture
+def dependencies():
+    advisor = ModuleType(f"{PACKAGE}.daily_advisor")
+    advisor.advisor_context = Mock(return_value=None)
+    models = ModuleType(f"{PACKAGE}.models")
+    models.PriceEntry = lambda time, price: SimpleNamespace(time=time, price=price)
+    sensor = ModuleType(f"{PACKAGE}.sensor")
+    sensor._cached_all_in_entries = Mock(return_value=[])
+    smart = ModuleType(f"{PACKAGE}.smart_energy")
+    smart.build_smart_energy_advice = Mock(return_value={"daily_advisor": {"state": "ready"}})
+    with patch.dict("sys.modules", {
+        advisor.__name__: advisor,
+        models.__name__: models,
+        sensor.__name__: sensor,
+        smart.__name__: smart,
+    }):
+        yield smart
 
 
 def make_worker():
     hass = SimpleNamespace(
-        async_create_task=lambda coroutine: asyncio.create_task(coroutine),
+        async_create_task=asyncio.create_task,
         async_add_executor_job=None,
         config=SimpleNamespace(language="nl"),
     )
@@ -56,16 +61,14 @@ def make_worker():
         hass=hass,
         entry=SimpleNamespace(data={}, options={}),
         data=None,
-        daily_forecast=SimpleNamespace(data={}),
     )
     worker = _AsyncDailyAdvice(coordinator)
     sensor = Mock()
-    sensor.async_write_ha_state = Mock()
     return worker, coordinator, sensor
 
 
 @pytest.mark.asyncio
-async def test_advisor_computes_off_event_loop_and_publishes_result():
+async def test_calculation_is_deferred_and_result_published(dependencies):
     worker, coordinator, sensor = make_worker()
     entered = asyncio.Event()
     release = asyncio.Event()
@@ -76,23 +79,20 @@ async def test_advisor_computes_off_event_loop_and_publishes_result():
         return fn()
 
     coordinator.hass.async_add_executor_job = executor
-    with (
-        patch("custom_components.nl_day_ahead_prices.daily_advisor.advisor_context", return_value=None),
-        patch("custom_components.nl_day_ahead_prices.smart_energy.build_smart_energy_advice",
-              return_value={"daily_advisor": {"state": "ready", "best_window": None}}),
-    ):
-        worker.add(sensor)
-        await entered.wait()
+    worker.add(sensor)
+    try:
+        await asyncio.wait_for(entered.wait(), timeout=3)
         assert worker.result is None
-        assert sensor.async_write_ha_state.call_count == 0
+        sensor.async_write_ha_state.assert_not_called()
+    finally:
         release.set()
-        await worker.task
+    await asyncio.wait_for(worker.task, timeout=3)
     assert worker.result["state"] == "ready"
     sensor.async_write_ha_state.assert_called_once_with()
 
 
 @pytest.mark.asyncio
-async def test_stale_advice_is_discarded_after_new_request():
+async def test_refresh_drops_stale_result(dependencies):
     worker, coordinator, sensor = make_worker()
     entered = asyncio.Event()
     release = asyncio.Event()
@@ -108,19 +108,20 @@ async def test_stale_advice_is_discarded_after_new_request():
         return {"daily_advisor": {"state": "fresh"}}
 
     coordinator.hass.async_add_executor_job = executor
-    with patch("custom_components.nl_day_ahead_prices.daily_advisor.advisor_context", return_value=None):
-        worker.add(sensor)
-        await entered.wait()
+    worker.add(sensor)
+    try:
+        await asyncio.wait_for(entered.wait(), timeout=3)
         worker.request()
+    finally:
         release.set()
-        await worker.task
+    await asyncio.wait_for(worker.task, timeout=3)
     assert calls == 2
     assert worker.result["state"] == "fresh"
     sensor.async_write_ha_state.assert_called_once_with()
 
 
 @pytest.mark.asyncio
-async def test_unload_cancels_pending_advice_without_publishing():
+async def test_unload_cancels_background_task(dependencies):
     worker, coordinator, sensor = make_worker()
     entered = asyncio.Event()
 
@@ -129,12 +130,11 @@ async def test_unload_cancels_pending_advice_without_publishing():
         await asyncio.Event().wait()
 
     coordinator.hass.async_add_executor_job = executor
-    with patch("custom_components.nl_day_ahead_prices.daily_advisor.advisor_context", return_value=None):
-        worker.add(sensor)
-        await entered.wait()
-        task = worker.task
-        worker.remove(sensor)
-        with pytest.raises(asyncio.CancelledError):
-            await task
+    worker.add(sensor)
+    await asyncio.wait_for(entered.wait(), timeout=3)
+    task = worker.task
+    worker.remove(sensor)
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.wait_for(task, timeout=3)
     assert worker.result is None
     sensor.async_write_ha_state.assert_not_called()
