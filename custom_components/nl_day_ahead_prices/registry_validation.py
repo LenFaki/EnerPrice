@@ -32,6 +32,8 @@ TARIFF_FIELDS = frozenset({
     "feed_in_fee", "imbalance_fee", "profile_version", "supports_hourly_prices",
     "supports_quarter_hour_prices",
 })
+# Accepted when present so registries without them stay valid.
+OPTIONAL_TARIFF_FIELDS = frozenset({"export_market_vat_included"})
 
 def utc_timestamp(value: Any) -> datetime:
     """Require an ISO timestamp with an explicit UTC offset."""
@@ -70,7 +72,7 @@ def parse_remote_registry(payload: Any) -> SupplierRegistry:
         if not isinstance(records, list) or not 1 <= len(records) <= 100:
             raise ValueError("Invalid tariff list")
         for record in records:
-            if not isinstance(record, dict) or set(record) != TARIFF_FIELDS:
+            if not isinstance(record, dict) or not TARIFF_FIELDS <= set(record) <= TARIFF_FIELDS | OPTIONAL_TARIFF_FIELDS:
                 raise ValueError("Invalid tariff fields")
             for field, (minimum, maximum) in NUMERIC_TARIFF_BOUNDS.items():
                 value = record[field]

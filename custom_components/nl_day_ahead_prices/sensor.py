@@ -28,6 +28,7 @@ from .calculations import (
     calculate_monthly_fee,
     calculate_supplier_export_fee,
     calculate_supplier_fee,
+    export_entries_for_supplier,
 )
 from .const import (
     CONF_ADVICE_LANGUAGE,
@@ -41,6 +42,7 @@ from .const import (
     CONF_CUSTOM_PURCHASE_FEE_INCLUDES_VAT,
     CONF_CUSTOM_SELL_FEE_ELECTRICITY,
     CONF_CUSTOM_SELL_FEE_INCLUDES_VAT,
+    CONF_CUSTOM_SELL_MARKET_PRICE_INCLUDES_VAT,
     CONF_CUSTOM_SUPPLIER_NAME,
     CONF_ELECTRIC_EFFICIENCY,
     CONF_ENERGY_TAX,
@@ -67,6 +69,7 @@ from .const import (
     DEFAULT_CUSTOM_PURCHASE_FEE_INCLUDES_VAT,
     DEFAULT_CUSTOM_SELL_FEE_ELECTRICITY,
     DEFAULT_CUSTOM_SELL_FEE_INCLUDES_VAT,
+    DEFAULT_CUSTOM_SELL_MARKET_PRICE_INCLUDES_VAT,
     DEFAULT_CUSTOM_SUPPLIER_NAME,
     DEFAULT_ELECTRIC_EFFICIENCY,
     DEFAULT_ENERGY_TAX,
@@ -235,6 +238,9 @@ def _custom_supplier_profile(entry: ConfigEntry) -> SupplierProfile:
             options.get(CONF_CUSTOM_SELL_FEE_ELECTRICITY, DEFAULT_CUSTOM_SELL_FEE_ELECTRICITY)
         ),
         sell_fee_includes_vat=bool(options.get(CONF_CUSTOM_SELL_FEE_INCLUDES_VAT, DEFAULT_CUSTOM_SELL_FEE_INCLUDES_VAT)),
+        sell_market_price_includes_vat=bool(
+            options.get(CONF_CUSTOM_SELL_MARKET_PRICE_INCLUDES_VAT, DEFAULT_CUSTOM_SELL_MARKET_PRICE_INCLUDES_VAT)
+        ),
         last_verified=None,
         source_url=None,
         price_resolution=PRICE_RESOLUTION_HOURLY,
@@ -268,6 +274,19 @@ def _cached_all_in_entries(
     if cached_analysis is None:
         return _all_in_entries(data, entry)
     return cached_analysis("all_in_entries", lambda: _all_in_entries(data, entry))
+
+
+def _cached_sell_entries(
+    coordinator: NLDayAheadPricesCoordinator | None,
+    data: PriceData,
+    entry: ConfigEntry,
+) -> list:
+    """Return sell prices cached for the current coordinator cycle.
+
+    The coordinator clears this on new data, registry updates, runtime option
+    changes and interval boundaries; entry option changes reload the entry.
+    """
+    return _cached_value(coordinator, "sell_entries", lambda: _sell_entries(data, entry))
 
 
 def _cached_value(coordinator: NLDayAheadPricesCoordinator | None, key: str, factory):
@@ -312,6 +331,8 @@ def _analysis_value(
     runtime: dict[str, Any],
     coordinator: NLDayAheadPricesCoordinator | None = None,
 ) -> Any:
+    if key == "current_sell_price":
+        return current_price(_cached_sell_entries(coordinator, data, entry), now)
     prices = (
         _cached_all_in_entries(coordinator, data, entry)
         if coordinator is not None
@@ -365,6 +386,7 @@ def _v2_data(
     entry: ConfigEntry,
     language: str = "en",
     all_in: list | None = None,
+    sell_entries: list | None = None,
 ) -> dict[str, Any]:
     """Return state and attributes for an EnerPrice v2 sensor."""
     all_in = _all_in_entries(data, entry) if all_in is None else all_in
@@ -400,7 +422,7 @@ def _v2_data(
     if key == "energy_opportunity":
         result = calculate_opportunity(all_in, language)
         return {"state": result["state"], **result}
-    sell_prices = _sell_entries(data, entry)
+    sell_prices = _sell_entries(data, entry) if sell_entries is None else sell_entries
     if not sell_prices:
         return {"state": None}
     if key == "best_export_period":
@@ -436,9 +458,8 @@ def _v2_data(
 
 
 def _sell_entries(data: PriceData, entry: ConfigEntry) -> list:
-    profile = _selected_supplier_profile(entry)
-    fee = calculate_supplier_export_fee(profile, _vat(entry))
-    return [type(item)(item.time, item.price * (1 + _vat(entry)) - fee) for item in data.result.prices]
+    """Use the same interval-date tariff selection as the Daily Advisor export prices."""
+    return export_entries_for_supplier(data.result.prices, _selected_supplier_profile(entry), _vat(entry))
 
 
 def _periods(data: PriceData, entry: ConfigEntry, runtime: dict[str, Any], *, peak: bool, prices: list | None = None):
@@ -515,6 +536,15 @@ SENSORS: tuple[NLPriceSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=4,
         value_fn=_current_market,
+    ),
+    NLPriceSensorDescription(
+        key="current_sell_price",
+        translation_key="current_sell_price",
+        native_unit_of_measurement=EUR_PER_KWH,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=4,
+        value_fn=lambda data, now, entry: None,
+        analysis_key="current_sell_price",
     ),
     NLPriceSensorDescription(
         key="next_hour_market_price",
@@ -850,6 +880,7 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
     _unrecorded_attributes = frozenset({
         "prices", "prices_today", "prices_tomorrow",
         "all_in_prices", "all_in_prices_today", "all_in_prices_tomorrow",
+        "sell_prices_today", "sell_prices_tomorrow",
         "raw_prices", "raw_prices_today", "raw_prices_tomorrow",
         "raw_today", "raw_tomorrow", "supplier_profile",
         "best_periods", "peak_periods",
@@ -898,6 +929,7 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
                         self.entry,
                         language,
                         _cached_all_in_entries(self.coordinator, self.coordinator.data, self.entry),
+                        _cached_sell_entries(self.coordinator, self.coordinator.data, self.entry),
                     ),
                 )
                 value = result["state"]
@@ -937,10 +969,14 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
             },
         )
         all_in_attributes = shared_price_attributes["all_in_prices"]
+        sell_entries = _cached_sell_entries(self.coordinator, data, self.entry)
+        sell_attributes = [entry.as_attribute() for entry in sell_entries]
         base = {
             **shared_price_attributes,
             "all_in_prices_today": all_in_attributes[:today_count],
             "all_in_prices_tomorrow": all_in_attributes[today_count:],
+            "sell_prices_today": sell_attributes[:today_count],
+            "sell_prices_tomorrow": sell_attributes[today_count:],
             "price_resolution": data.result.effective_price_resolution,
             "requested_price_resolution": data.result.requested_price_resolution,
             "effective_price_resolution": data.result.effective_price_resolution,
@@ -993,7 +1029,9 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
             "source_provider": data.result.provider,
             "market_price": current_entry.price if current_entry else None,
             "all_in_price": current_all_in,
+            "sell_price": current_price(sell_entries, now),
             "supplier_fee": round(calculate_supplier_fee(supplier_profile, _vat(self.entry)), 6),
+            "supplier_export_fee": round(calculate_supplier_export_fee(supplier_profile, _vat(self.entry)), 6),
             "rating_3_level": rating_3,
             "rating_5_level": rating_5,
             "trend": trend["trend"],
@@ -1030,7 +1068,7 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
             v2_attributes = dict(
                 self.coordinator.cached_analysis(
                     f"v2:{language}:{key}",
-                    lambda: _v2_data(key, data, now, self.entry, language, all_in_entries),
+                    lambda: _v2_data(key, data, now, self.entry, language, all_in_entries, sell_entries),
                 )
             )
             v2_attributes.pop("state", None)

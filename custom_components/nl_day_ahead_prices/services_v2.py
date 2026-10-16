@@ -11,7 +11,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
-from .calculations import all_in_entries_for_supplier, calculate_supplier_export_fee
+from .calculations import all_in_entries_for_supplier, export_entries_for_supplier
 from .const import (
     CONF_ADVICE_LANGUAGE,
     CONF_ELECTRIC_EFFICIENCY,
@@ -312,8 +312,9 @@ def _prices(coordinator, price_type: str, include_sell_fee: bool) -> list[PriceE
     if price_type == "market":
         return coordinator.data.result.prices
     if price_type == "sell":
-        fee = calculate_supplier_export_fee(profile, _vat(entry)) if include_sell_fee else 0.0
-        return [PriceEntry(item.time, item.price * (1 + _vat(entry)) - fee) for item in coordinator.data.result.prices]
+        return export_entries_for_supplier(
+            coordinator.data.result.prices, profile, _vat(entry), include_fee=include_sell_fee
+        )
     return all_in_entries_for_supplier(coordinator.data.result.prices, _energy_tax(entry), profile, _vat(entry))
 
 
