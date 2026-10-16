@@ -481,6 +481,8 @@ def test_daily_advice_profiling_warns_only_on_slow_cache_misses(advice_runtime, 
     # started, conversion end, context end, calculation end, total end.
     ticks = iter([0.0, .001, .002, elapsed - .001, elapsed])
     monkeypatch.setattr(module, "perf_counter", lambda: next(ticks))
+    # Test outer recomputation timings independently of nested context timings.
+    monkeypatch.setattr(module, "advisor_context", lambda *_: {})
     warning = Mock()
     monkeypatch.setattr(module._LOGGER, "warning", warning)
 
@@ -491,6 +493,32 @@ def test_daily_advice_profiling_warns_only_on_slow_cache_misses(advice_runtime, 
         assert warning.call_count == 1
         assert "recomputation took" in warning.call_args.args[0]
         assert warning.call_args.args[1] == pytest.approx(elapsed * 1000)
+
+
+@pytest.mark.parametrize("snapshot_seconds,export_seconds,expected_warning", [
+    (.28, .02, True), (.01, .01, False),
+])
+def test_daily_advisor_context_profiles_snapshot_and_export(advice_runtime, monkeypatch,
+                                                             snapshot_seconds, export_seconds, expected_warning):
+    """Only slow contexts log, and each stage is timed separately."""
+    module = advice_runtime.adapter.module
+    coordinator = advice_runtime.coordinator
+    ticks = iter([0.0, snapshot_seconds, snapshot_seconds + export_seconds])
+    monkeypatch.setattr(module, "perf_counter", lambda: next(ticks))
+    warning = Mock()
+    monkeypatch.setattr(module._LOGGER, "warning", warning)
+
+    result = module.advisor_context(coordinator)
+
+    assert result["forecast"] is not None
+    assert len(result["export_prices"]) == len(coordinator.data.result.prices)
+    assert warning.called is expected_warning
+    if expected_warning:
+        args = warning.call_args.args
+        assert "context took" in args[0]
+        assert args[1] == pytest.approx((snapshot_seconds + export_seconds) * 1000)
+        assert args[2] == pytest.approx(snapshot_seconds * 1000)
+        assert args[3] == pytest.approx(export_seconds * 1000)
 
 
 def test_daily_solar_interpolation_reuses_forecast_boundaries(monkeypatch):
