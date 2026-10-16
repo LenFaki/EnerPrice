@@ -24,9 +24,11 @@ class _AsyncDailyAdvice:
         self.sensors = set()
         self.revision = 0
         self.task = None
+        self._pending = False
 
     def request(self):
         self.revision += 1
+        self._pending = True
         if self.task is None or self.task.done():
             self.task = self.coordinator.hass.async_create_task(self._run())
 
@@ -38,6 +40,7 @@ class _AsyncDailyAdvice:
 
         while self.sensors:
             revision = self.revision
+            self._pending = False
             coordinator = self.coordinator
             options = {**coordinator.entry.data, **coordinator.entry.options}
             language = options.get(CONF_ADVICE_LANGUAGE, "auto")
@@ -63,7 +66,7 @@ class _AsyncDailyAdvice:
                 if revision == self.revision:
                     return
                 continue
-            if revision == self.revision:
+            if revision == self.revision and not self._pending:
                 self.result = advice["daily_advisor"]
                 for sensor in tuple(self.sensors):
                     sensor.async_write_ha_state()
@@ -76,10 +79,10 @@ class _AsyncDailyAdvice:
 
     def remove(self, sensor):
         self.sensors.discard(sensor)
+        if not self.sensors:
+            self.revision += 1
         if not self.sensors and self.task and not self.task.done():
             self.task.cancel()
-
-
 
 
 def daily_advice_entities(coordinator, entry):
