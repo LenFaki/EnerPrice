@@ -42,7 +42,8 @@ with patch.dict(sys.modules, {
     _AsyncDailyAdvice = module._AsyncDailyAdvice
 
 # patch() resolves package attributes, not only sys.modules entries.
-integration_package.daily_advisor = sys.modules["custom_components.nl_day_ahead_prices.daily_advisor"]
+integration_package.daily_advisor = ModuleType("custom_components.nl_day_ahead_prices.daily_advisor")
+integration_package.daily_advisor.advisor_context = lambda coordinator: None
 
 
 def make_worker():
