@@ -1,9 +1,9 @@
 """Regression coverage for asynchronous Daily Advisor sensor calculations."""
 
 import asyncio
-import importlib
 import importlib.util
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from unittest.mock import Mock, patch
@@ -21,15 +21,16 @@ const_module.UnitOfEnergy = SimpleNamespace(KILO_WATT_HOUR="kWh")
 coordinator_module = ModuleType("homeassistant.helpers.update_coordinator")
 coordinator_module.CoordinatorEntity = type("CoordinatorEntity", (), {})
 util_module = ModuleType("homeassistant.util")
-advisor_module = importlib.import_module("custom_components.nl_day_ahead_prices.daily_advisor")
-util_module.dt = advisor_module.dt_util
+util_module.dt = SimpleNamespace(utcnow=lambda: datetime.now(timezone.utc))
 
 with patch.dict(sys.modules, {
     "homeassistant.components.sensor": sensor_module,
     "homeassistant.const": const_module,
     "homeassistant.helpers.update_coordinator": coordinator_module,
     "homeassistant.util": util_module,
+    "custom_components.nl_day_ahead_prices.daily_advisor": ModuleType("custom_components.nl_day_ahead_prices.daily_advisor"),
 }):
+    sys.modules["custom_components.nl_day_ahead_prices.daily_advisor"].advisor_context = lambda coordinator: None
     spec = importlib.util.spec_from_file_location(
         "_enerprice_daily_sensor_test",
         Path(__file__).parents[1] / "custom_components/nl_day_ahead_prices/daily_sensor.py",
