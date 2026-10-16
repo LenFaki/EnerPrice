@@ -59,7 +59,8 @@ def make_worker():
         daily_forecast=SimpleNamespace(data={}),
     )
     worker = _AsyncDailyAdvice(coordinator)
-    sensor = SimpleNamespace(async_write_ha_state=Mock())
+    sensor = Mock()
+    sensor.async_write_ha_state = Mock()
     return worker, coordinator, sensor
 
 
