@@ -78,8 +78,11 @@ class BasePriceProvider(ABC):
                         if response.status == 204:
                             return None
                         response.raise_for_status()
-                        return await response.json(content_type=None)
-            except (TimeoutError, ClientError) as err:
+                        data = await response.json(content_type=None)
+                        if data is None:
+                            raise ValueError("empty JSON response")
+                        return data
+            except (TimeoutError, ClientError, ValueError) as err:
                 last_error = err
                 if attempt + 1 < REQUEST_RETRIES:
                     await asyncio.sleep(1)
