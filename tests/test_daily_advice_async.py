@@ -1,6 +1,7 @@
 """Regression coverage for asynchronous Daily Advisor sensor calculations."""
 
 import asyncio
+import importlib
 import importlib.util
 import sys
 from pathlib import Path
@@ -20,7 +21,7 @@ const_module.UnitOfEnergy = SimpleNamespace(KILO_WATT_HOUR="kWh")
 coordinator_module = ModuleType("homeassistant.helpers.update_coordinator")
 coordinator_module.CoordinatorEntity = type("CoordinatorEntity", (), {})
 util_module = ModuleType("homeassistant.util")
-from custom_components.nl_day_ahead_prices import daily_advisor as advisor_module
+advisor_module = importlib.import_module("custom_components.nl_day_ahead_prices.daily_advisor")
 util_module.dt = advisor_module.dt_util
 
 with patch.dict(sys.modules, {
