@@ -435,6 +435,45 @@ def test_trajectory_reuses_all_in_and_trend_within_coordinator_cycle(sensor_modu
     assert trend_calls == 1
 
 
+def test_sell_series_is_built_once_per_coordinator_cycle(sensor_module, monkeypatch):
+    """The sell price state, chart attributes and export advisor share one sell series."""
+    price_sensor = make_sensor(sensor_module, day_prices("2026-09-08", 15), extended=True)
+    coordinator, entry = price_sensor.coordinator, price_sensor.entry
+    coordinator.hass = SimpleNamespace(config=SimpleNamespace(language="en"))
+    cache = {}
+    def cached_analysis(key, factory):
+        if key not in cache:
+            cache[key] = factory()
+        return cache[key]
+    coordinator.cached_analysis = cached_analysis
+
+    def entity(key):
+        description = next(item for item in sensor_module.SENSORS if item.key == key)
+        return sensor_module.NLDayAheadPriceSensor(coordinator, entry, description)
+
+    original = sensor_module._sell_entries
+    calls = 0
+    def counted(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return original(*args, **kwargs)
+    monkeypatch.setattr(sensor_module, "_sell_entries", counted)
+
+    sell_sensor, export_advisor = entity("current_sell_price"), entity("export_advisor")
+    for _ in range(3):
+        state = sell_sensor.native_value
+        assert state is not None
+    attrs = price_sensor.extra_state_attributes
+    assert export_advisor.extra_state_attributes["current_sell_price"] == pytest.approx(state)
+    assert attrs["sell_price"] == pytest.approx(state)
+    assert calls == 1
+
+    # Clearing the cache (new data, interval boundary, option change) rebuilds the series.
+    cache.clear()
+    assert sell_sensor.native_value == state
+    assert calls == 2
+
+
 def test_rating_does_not_calculate_trend(sensor_module, monkeypatch):
     """Rating sensors should not pay for unrelated trend analysis."""
     sensor = make_sensor(sensor_module, day_prices("2026-09-08", 15))

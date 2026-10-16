@@ -118,10 +118,6 @@ def _current_market(data: PriceData, now: datetime, entry: ConfigEntry) -> float
     return current_price(data.result.prices, now)
 
 
-def _current_sell_price(data: PriceData, now: datetime, entry: ConfigEntry) -> float | None:
-    return current_price(_sell_entries(data, entry), now)
-
-
 def _next_hour(data: PriceData, now: datetime, entry: ConfigEntry) -> float | None:
     return next_hour_price(data.result.prices, now)
 
@@ -280,6 +276,19 @@ def _cached_all_in_entries(
     return cached_analysis("all_in_entries", lambda: _all_in_entries(data, entry))
 
 
+def _cached_sell_entries(
+    coordinator: NLDayAheadPricesCoordinator | None,
+    data: PriceData,
+    entry: ConfigEntry,
+) -> list:
+    """Return sell prices cached for the current coordinator cycle.
+
+    The coordinator clears this on new data, registry updates, runtime option
+    changes and interval boundaries; entry option changes reload the entry.
+    """
+    return _cached_value(coordinator, "sell_entries", lambda: _sell_entries(data, entry))
+
+
 def _cached_value(coordinator: NLDayAheadPricesCoordinator | None, key: str, factory):
     """Use the coordinator cache when available, with a direct-call fallback."""
     cached_analysis = getattr(coordinator, "cached_analysis", None)
@@ -322,6 +331,8 @@ def _analysis_value(
     runtime: dict[str, Any],
     coordinator: NLDayAheadPricesCoordinator | None = None,
 ) -> Any:
+    if key == "current_sell_price":
+        return current_price(_cached_sell_entries(coordinator, data, entry), now)
     prices = (
         _cached_all_in_entries(coordinator, data, entry)
         if coordinator is not None
@@ -375,6 +386,7 @@ def _v2_data(
     entry: ConfigEntry,
     language: str = "en",
     all_in: list | None = None,
+    sell_entries: list | None = None,
 ) -> dict[str, Any]:
     """Return state and attributes for an EnerPrice v2 sensor."""
     all_in = _all_in_entries(data, entry) if all_in is None else all_in
@@ -410,7 +422,7 @@ def _v2_data(
     if key == "energy_opportunity":
         result = calculate_opportunity(all_in, language)
         return {"state": result["state"], **result}
-    sell_prices = _sell_entries(data, entry)
+    sell_prices = _sell_entries(data, entry) if sell_entries is None else sell_entries
     if not sell_prices:
         return {"state": None}
     if key == "best_export_period":
@@ -531,7 +543,8 @@ SENSORS: tuple[NLPriceSensorDescription, ...] = (
         native_unit_of_measurement=EUR_PER_KWH,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=4,
-        value_fn=_current_sell_price,
+        value_fn=lambda data, now, entry: None,
+        analysis_key="current_sell_price",
     ),
     NLPriceSensorDescription(
         key="next_hour_market_price",
@@ -916,6 +929,7 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
                         self.entry,
                         language,
                         _cached_all_in_entries(self.coordinator, self.coordinator.data, self.entry),
+                        _cached_sell_entries(self.coordinator, self.coordinator.data, self.entry),
                     ),
                 )
                 value = result["state"]
@@ -955,7 +969,7 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
             },
         )
         all_in_attributes = shared_price_attributes["all_in_prices"]
-        sell_entries = _cached_value(self.coordinator, "sell_entries", lambda: _sell_entries(data, self.entry))
+        sell_entries = _cached_sell_entries(self.coordinator, data, self.entry)
         sell_attributes = [entry.as_attribute() for entry in sell_entries]
         base = {
             **shared_price_attributes,
@@ -1054,7 +1068,7 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
             v2_attributes = dict(
                 self.coordinator.cached_analysis(
                     f"v2:{language}:{key}",
-                    lambda: _v2_data(key, data, now, self.entry, language, all_in_entries),
+                    lambda: _v2_data(key, data, now, self.entry, language, all_in_entries, sell_entries),
                 )
             )
             v2_attributes.pop("state", None)
