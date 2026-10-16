@@ -232,6 +232,7 @@ def _daily_advice(prices, now, context, power_w, language):
     started = perf_counter()
     grid_ms = 0.0
     solar_ms = 0.0
+    solar_optimizer_ms = 0.0
     chart_ms = 0.0
     nl = language.lower().startswith("nl")
     now = now.astimezone(timezone.utc)
@@ -328,10 +329,12 @@ def _daily_advice(prices, now, context, power_w, language):
                     solar_diagnostics.append("solar_forecast_interval_incomplete")
                 if missing_export_price:
                     solar_diagnostics.append("export_price_missing")
+                optimizer_started = perf_counter()
                 solar_plan = optimize_intervals(
                     adjusted, duration, alternatives=0, resolution_minutes=minutes,
                     window_filter=lambda window, times=solar_times: any(item.time in times for item in window),
                 )
+                solar_optimizer_ms += (perf_counter() - optimizer_started) * 1000
                 if not solar_plan:
                     solar_diagnostics.append("no_eligible_solar_window")
                 if solar_plan:
@@ -351,9 +354,9 @@ def _daily_advice(prices, now, context, power_w, language):
     if total_ms >= 250:
         _LOGGER.warning(
             "EnerPrice Daily Advisor planning took %.1f ms "
-            "(chart: %.1f ms, grid optimization: %.1f ms, solar integration: %.1f ms; "
+            "(chart: %.1f ms, grid optimization: %.1f ms, solar integration: %.1f ms, solar optimization: %.1f ms; "
             "resolution: %d min, forecast installations: %d).",
-            total_ms, chart_ms, grid_ms, solar_ms, minutes, len(series),
+            total_ms, chart_ms, grid_ms, solar_ms, solar_optimizer_ms, minutes, len(series),
         )
     return {
         "state": "ready" if best else "unavailable", "best_window": best, "days": days,
