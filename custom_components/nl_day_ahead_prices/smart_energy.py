@@ -5,12 +5,16 @@ from __future__ import annotations
 from bisect import bisect_right
 from datetime import datetime, time, timedelta, timezone
 from functools import cache
+from time import perf_counter
+import logging
 from math import ceil, isfinite
 from typing import Any
 
 from .models import PriceEntry
 from .optimizer import optimize_intervals
 from .solar_forecast import AMSTERDAM
+
+_LOGGER = logging.getLogger(__name__)
 
 DEFAULT_GAS_KWH_PER_M3 = 9.769
 
@@ -225,6 +229,10 @@ def _daily_advice(prices, now, context, power_w, language):
     Grid-only windows and conditional solar alternatives remain separate models.
     A point-in-time measurement never becomes a claim of future measured surplus.
     """
+    started = perf_counter()
+    grid_ms = 0.0
+    solar_ms = 0.0
+    chart_ms = 0.0
     nl = language.lower().startswith("nl")
     now = now.astimezone(timezone.utc)
     forecast = context.get("forecast", {})
@@ -280,14 +288,18 @@ def _daily_advice(prices, now, context, power_w, language):
         daily = {"date": day.isoformat(), "price_status": price_status, "known_intervals": len(known),
                  "expected_intervals": len(stamps), "solar_energy_kwh": solar_days.get(day.isoformat(), {}).get("energy_kwh"),
                  "solar_status": solar_days.get(day.isoformat(), {}).get("status", "missing"), "window": None}
+        chart_started = perf_counter()
         for stamp in stamps:
             solar_w = power_at(stamp.timestamp())
             chart.append({"time": stamp.isoformat(), "price": price_map.get(stamp), "solar_kw": solar_w / 1000 if solar_w is not None else None})
+        chart_ms += (perf_counter() - chart_started) * 1000
         # Never optimize across a missing price interval or extend the last known price.
         complete = future and all(stamp in price_map for stamp in future)
         if complete:
             entries = [PriceEntry(stamp, price_map[stamp]) for stamp in future]
+            grid_started = perf_counter()
             plan = optimize_intervals(entries, duration, alternatives=0, resolution_minutes=minutes)
+            grid_ms += (perf_counter() - grid_started) * 1000
             if plan:
                 reference = sum(item.price for item in entries[:duration // minutes]) / (duration // minutes)
                 daily["window"] = _daily_window(plan, power_w, reference, "earliest_remaining_grid_window", "grid_only", nl)
@@ -297,6 +309,7 @@ def _daily_advice(prices, now, context, power_w, language):
                 missing_export_price = False
                 incomplete_solar_interval = False
                 solar_times = set()
+                solar_started = perf_counter()
                 for item in entries:
                     own = _solar_load_energy(series, item.time.timestamp(), (item.time + step).timestamp(), baseline, power_w, power_at=power_at)
                     if own is None:
@@ -310,6 +323,7 @@ def _daily_advice(prices, now, context, power_w, language):
                     load = power_w / 1000 * minutes / 60
                     cost = (load - own) * item.price + own * export_map[item.time]
                     adjusted.append(PriceEntry(item.time, cost / load))
+                solar_ms += (perf_counter() - solar_started) * 1000
                 if incomplete_solar_interval:
                     solar_diagnostics.append("solar_forecast_interval_incomplete")
                 if missing_export_price:
@@ -333,6 +347,14 @@ def _daily_advice(prices, now, context, power_w, language):
         solar_diagnostics.append("no_eligible_solar_window")
     grid_windows = [day["window"] for day in days if day["window"]]
     best = min(grid_windows, key=lambda item: item["average_price_eur_kwh"], default=None)
+    total_ms = (perf_counter() - started) * 1000
+    if total_ms >= 250:
+        _LOGGER.warning(
+            "EnerPrice Daily Advisor planning took %.1f ms "
+            "(chart: %.1f ms, grid optimization: %.1f ms, solar integration: %.1f ms; "
+            "resolution: %d min, forecast installations: %d).",
+            total_ms, chart_ms, grid_ms, solar_ms, minutes, len(series),
+        )
     return {
         "state": "ready" if best else "unavailable", "best_window": best, "days": days,
         "advice": advice[:3], "chart": chart[:300], "forecast_quality": forecast.get("quality", "unavailable"),
