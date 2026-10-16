@@ -1,12 +1,86 @@
 """Bounded forecast summaries, separate from price and savings semantics."""
 
-from datetime import datetime
+import asyncio
+import logging
+from datetime import datetime, timezone
+from functools import partial
+
+from homeassistant.util import dt as dt_util
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.const import EntityCategory, UnitOfEnergy
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import CONF_ADVICE_LANGUAGE, CONF_FLEXIBLE_LOAD_POWER_W, DOMAIN
+
+_LOGGER = logging.getLogger(__name__)
+
+
+class _AsyncDailyAdvice:
+    """Compute expensive advice off the HA event loop and publish only fresh results."""
+
+    def __init__(self, coordinator):
+        self.coordinator = coordinator
+        self.result = None
+        self.sensors = set()
+        self.revision = 0
+        self.task = None
+
+    def request(self):
+        self.revision += 1
+        if self.task is None or self.task.done():
+            self.task = self.coordinator.hass.async_create_task(self._run())
+
+    async def _run(self):
+        from .daily_advisor import advisor_context
+        from .models import PriceEntry
+        from .sensor import _cached_all_in_entries
+        from .smart_energy import build_smart_energy_advice
+
+        while self.sensors:
+            revision = self.revision
+            coordinator = self.coordinator
+            options = {**coordinator.entry.data, **coordinator.entry.options}
+            language = options.get(CONF_ADVICE_LANGUAGE, "auto")
+            if language == "auto":
+                language = coordinator.hass.config.language
+            now = dt_util.utcnow()
+            prices = (_cached_all_in_entries(coordinator, coordinator.data, coordinator.entry)
+                      if coordinator.data else [])
+            utc_prices = [PriceEntry(item.time.astimezone(timezone.utc), item.price) for item in prices]
+            context = advisor_context(coordinator)
+            calculate = partial(
+                build_smart_energy_advice, electricity_price=None,
+                future_prices=utc_prices, now=now,
+                flexible_load_power_w=options.get(CONF_FLEXIBLE_LOAD_POWER_W),
+                language=language, daily_context=context,
+            )
+            try:
+                advice = await coordinator.hass.async_add_executor_job(calculate)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                _LOGGER.exception("EnerPrice Daily Advisor background calculation failed")
+                if revision == self.revision:
+                    return
+                continue
+            if revision == self.revision:
+                self.result = advice["daily_advisor"]
+                for sensor in tuple(self.sensors):
+                    sensor.async_write_ha_state()
+                return
+            # Inputs changed during calculation: discard stale output and rerun.
+
+    def add(self, sensor):
+        self.sensors.add(sensor)
+        self.request()
+
+    def remove(self, sensor):
+        self.sensors.discard(sensor)
+        if not self.sensors and self.task and not self.task.done():
+            self.task.cancel()
+
+
 
 
 def daily_advice_entities(coordinator, entry):
@@ -67,15 +141,23 @@ class DailyAdviceSensor(CoordinatorEntity, SensorEntity):
         self._attr_device_class = SensorDeviceClass.TIMESTAMP if key == "best_consumption_window" else SensorDeviceClass.ENUM
         if key == "daily_energy_advice":
             self._attr_options = ["ready", "unavailable"]
+        worker = getattr(coordinator, "_daily_advice_worker", None)
+        if worker is None:
+            worker = coordinator._daily_advice_worker = _AsyncDailyAdvice(coordinator)
+        self._worker = worker
 
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
-        self.async_on_remove(self.coordinator.daily_forecast.async_add_listener(self.async_write_ha_state))
+        self._worker.add(self)
+        self.async_on_remove(lambda: self._worker.remove(self))
+        self.async_on_remove(self.coordinator.daily_forecast.async_add_listener(self._worker.request))
+
+    def _handle_coordinator_update(self):
+        """Schedule a new result instead of blocking the sensor state callback."""
+        self._worker.request()
 
     def _advice(self):
-        from .daily_advisor import daily_advice
-
-        return daily_advice(self.coordinator)
+        return self._worker.result or {"state": "unavailable", "best_window": None}
 
     @property
     def available(self):
