@@ -13,6 +13,7 @@ from custom_components.nl_day_ahead_prices.models import (
     next_hour_price,
 )
 from custom_components.nl_day_ahead_prices.supplier_profiles import SupplierProfile
+from custom_components.nl_day_ahead_prices.supplier_registry import SUPPLIER_UPDATES_BUNDLED, get_supplier_tariff
 
 
 def test_convert_eur_mwh_to_eur_kwh() -> None:
@@ -119,3 +120,19 @@ def test_export_entries_follow_market_vat_flag() -> None:
     profile = _supplier_profile(key="custom", purchase_fee_export=0.02, sell_market_price_includes_vat=False)
 
     assert export_entries_for_supplier(prices, profile, 0.21)[0].price == pytest.approx(0.08)
+
+
+def test_pure_energie_sell_price_matches_supplier_prices() -> None:
+    # Live Pure Energie prices on 2026-10-12: market 0.18737, sell 0.17438 EUR/kWh.
+    profile = get_supplier_tariff("pure_energie", datetime(2026, 10, 12, tzinfo=timezone.utc), mode=SUPPLIER_UPDATES_BUNDLED)
+
+    assert profile != None
+    assert not profile.sell_market_price_includes_vat
+    assert calculate_sell_price(0.18737, profile, 0.21) == pytest.approx(0.17438)
+
+
+def test_pure_energie_export_entries_match_supplier_prices() -> None:
+    prices = [PriceEntry(datetime(2026, 10, 12, 10, tzinfo=timezone.utc), 0.18737)]
+    profile = get_supplier_tariff("pure_energie", datetime(2026, 10, 12, tzinfo=timezone.utc), mode=SUPPLIER_UPDATES_BUNDLED)
+
+    assert export_entries_for_supplier(prices, profile, 0.21)[0].price == pytest.approx(0.17438)
