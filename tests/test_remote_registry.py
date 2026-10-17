@@ -245,9 +245,21 @@ async def test_concurrency_and_daily_interval():
 def test_initial_remote_data_exactly_matches_bundle():
     candidate = payload(1)
     bundled = json.loads(registry.REGISTRY_FILE.read_text())
-    assert candidate["suppliers"] == bundled["suppliers"]
     assert remote.parse_remote_registry(candidate).revision == 1
-    assert remote.parse_remote_registry(candidate).suppliers["pure_energie"][0].purchase_fee_export == -0.01299
+
+    # Until the remote registry can publish export_market_vat_included, bundled
+    # records that use it may differ from the remote record in export terms only.
+    export_terms = {"purchase_fee_export", "export_market_vat_included", "notes"}
+    assert candidate["suppliers"].keys() == bundled["suppliers"].keys()
+    for key, bundled_supplier in bundled["suppliers"].items():
+        remote_supplier = candidate["suppliers"][key]
+        assert remote_supplier["name"] == bundled_supplier["name"]
+        assert len(remote_supplier["tariffs"]) == len(bundled_supplier["tariffs"]), key
+        for remote_record, bundled_record in zip(remote_supplier["tariffs"], bundled_supplier["tariffs"], strict=True):
+            ignored = export_terms if "export_market_vat_included" in bundled_record else set()
+            assert {k: v for k, v in remote_record.items() if k not in ignored} == {
+                k: v for k, v in bundled_record.items() if k not in ignored
+            }, key
 
 
 def test_export_market_vat_flag_defaults_to_included():
@@ -266,12 +278,12 @@ def test_export_market_vat_flag_is_accepted_when_present():
 def test_published_registry_does_not_use_export_market_vat_flag_yet():
     # Released clients require the exact v1 field set and would reject the
     # whole remote registry. Publish the field only in a separate registry
-    # revision once clients that accept it have been rolled out.
-    for path in (ROOT / "registry/supplier_tariffs.json", registry.REGISTRY_FILE):
-        data = json.loads(path.read_text())
-        for supplier in data["suppliers"].values():
-            for record in supplier["tariffs"]:
-                assert "export_market_vat_included" not in record, path
+    # revision once clients that accept it have been rolled out. The bundled
+    # file ships with clients that accept it, so it may already use the field.
+    data = json.loads((ROOT / "registry/supplier_tariffs.json").read_text())
+    for supplier in data["suppliers"].values():
+        for record in supplier["tariffs"]:
+            assert "export_market_vat_included" not in record
 
 
 def test_unknown_tariff_field_is_still_rejected():
