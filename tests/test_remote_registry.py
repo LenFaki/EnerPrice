@@ -255,7 +255,7 @@ def test_initial_remote_data_exactly_matches_bundle():
         remote_supplier = candidate["suppliers"][key]
         assert remote_supplier["name"] == bundled_supplier["name"]
         assert len(remote_supplier["tariffs"]) == len(bundled_supplier["tariffs"]), key
-        for remote_record, bundled_record in zip(remote_supplier["tariffs"], bundled_supplier["tariffs"]):
+        for remote_record, bundled_record in zip(remote_supplier["tariffs"], bundled_supplier["tariffs"], strict=True):
             ignored = export_terms if "export_market_vat_included" in bundled_record else set()
             assert {k: v for k, v in remote_record.items() if k not in ignored} == {
                 k: v for k, v in bundled_record.items() if k not in ignored

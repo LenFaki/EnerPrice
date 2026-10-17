@@ -126,7 +126,7 @@ def test_pure_energie_sell_price_matches_supplier_prices() -> None:
     # Live Pure Energie prices on 2026-10-12: market 0.18737, sell 0.17438 EUR/kWh.
     profile = get_supplier_tariff("pure_energie", datetime(2026, 10, 12, tzinfo=timezone.utc), mode=SUPPLIER_UPDATES_BUNDLED)
 
-    assert profile != None
+    assert profile is not None
     assert not profile.sell_market_price_includes_vat
     assert calculate_sell_price(0.18737, profile, 0.21) == pytest.approx(0.17438)
 
