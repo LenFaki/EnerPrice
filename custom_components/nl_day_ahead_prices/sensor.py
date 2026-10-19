@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from functools import partial
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from functools import partial
 from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorEntityDescription, SensorStateClass
