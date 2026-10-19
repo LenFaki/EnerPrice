@@ -487,27 +487,24 @@ def test_rating_does_not_calculate_trend(sensor_module, monkeypatch):
     assert sensor.native_value in {"low", "normal", "high"}
 
 
-def test_smart_advisor_calculates_once_per_state_write(sensor_module, monkeypatch):
-    """Native state and attributes must share a snapshot; the next write refreshes it."""
+def test_smart_advisor_reads_completed_snapshot_without_recalculating(sensor_module, monkeypatch):
+    """HA state and attributes read the same completed background result."""
     coordinator = SimpleNamespace(data=object(), daily_forecast=None)
     entry = SimpleNamespace(entry_id="test", data={}, options={})
     sensor = sensor_module.NLSmartEnergyAdvisorSensor(coordinator, entry)
-    calls = []
-
-    def advice():
-        calls.append(len(calls) + 1)
-        return {"state": "cheap_grid", "recommendation": f"result {len(calls)}"}
-
-    monkeypatch.setattr(sensor, "_advice", advice)
+    sensor._result = {"state": "cheap_grid", "recommendation": "result 1"}
+    monkeypatch.setattr(
+        sensor, "_build_calculation",
+        Mock(side_effect=AssertionError("state properties must not calculate advice")),
+    )
     assert sensor.native_value == "cheap_grid"
     assert sensor.extra_state_attributes["recommendation"] == "result 1"
-    assert len(calls) == 1
 
-    # CoordinatorEntity's parent write is normally provided by HA.
+    # A state write must not invalidate the completed snapshot or recompute.
     monkeypatch.setattr(
         type(sensor).__mro__[1], "async_write_ha_state", lambda self: None, raising=False
     )
     sensor.async_write_ha_state()
-    assert sensor.extra_state_attributes["recommendation"] == "result 2"
     assert sensor.native_value == "cheap_grid"
-    assert len(calls) == 2
+    assert sensor.extra_state_attributes["recommendation"] == "result 1"
+    sensor._build_calculation.assert_not_called()
