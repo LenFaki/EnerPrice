@@ -80,25 +80,31 @@ Want a dashboard similar to the screenshots? Visit the public **[EnerPrice Showc
 
 ## Dashboard examples
 
-These are example screenshots from a real Home Assistant installation. Sensor names, supplier tariffs, appliance settings and values will differ on your system. The screens use a custom Home Assistant Sections dashboard; EnerPrice does not automatically install this dashboard.
+Below are six updated screenshots from the **EnerPrice Showcase dashboard**. The layout is an example; prices, entities, supplier settings and measured values vary between installations. Explore the [live showcase](https://casakors.org/enerprice-showcase/overzicht) for inspiration.
 
-### Full dashboard
+### Overview
 
-![EnerPrice dashboard with prices, Smart Energy, chart and Daily Energy Advisor](images/dashboard-compleet.jpg)
+![EnerPrice – Overview](images/dashboard-overzicht.jpg)
 
-### Price advice and Smart Energy
+### Daily energy advice
 
-![EnerPrice price advice and Smart Energy Advisor](images/dashboard-prijsadvies-smart-energy.jpg)
+![EnerPrice – Daily energy advice](images/dashboard-dagelijks-advies.jpg)
 
-### Price chart and Daily Energy Advisor
+### Solar forecast
 
-![EnerPrice day-ahead price chart and daily consumption advice](images/dashboard-prijsgrafiek-dagelijks-advies.jpg)
+![EnerPrice – Solar forecast](images/dashboard-zonprognose.jpg)
 
-### Solar-aware advice
+### Export and feed-in
 
-![EnerPrice solar-aware advice and energy-check explanation](images/dashboard-zonbewust-advies.jpg)
+![EnerPrice – Export and feed-in](images/dashboard-teruglevering.jpg)
 
-The grid-only recommendation and conditional solar scenario are separate; forecast savings are not verified realized savings. Screenshots illustrate one configuration, not default entity IDs or guaranteed results.
+### Settings
+
+![EnerPrice – Settings](images/dashboard-instellingen.jpg)
+
+### Data sources and quality
+
+![EnerPrice – Data sources and quality](images/dashboard-databronnen.jpg)
 
 ## Dashboards and a simple setup path
 
