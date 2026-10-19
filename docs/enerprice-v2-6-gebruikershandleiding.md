@@ -61,6 +61,20 @@ Een voorkeur inschakelen is op zichzelf geen toestemming. De melding bevat het b
 
 Voor de optionele energieprestatiecontrole zijn **cumulatieve**, niet dagelijks terugzettende kWh/Wh-meters voor netafname en teruglevering nodig, plus een cumulatieve zonne-energiemeter. EnerPrice vergelijkt alleen gegevens wanneer metingen en daggrenzen voldoende compleet en betrouwbaar zijn. Ontbrekende gegevens blijven onbekend. De functie bewijst geen daadwerkelijke financiële besparing.
 
+## EnerPrice Showcase-dashboard
+
+Wil je een dashboard zoals in de screenshots? Bekijk het openbare **[EnerPrice Showcase-dashboard](https://casakors.org/enerprice-showcase/overzicht)**. Daar zie je een complete voorbeeldindeling met tabbladen voor overzicht, dagelijks energieadvies, zon, teruglevering, instellingen en gegevenskwaliteit.
+
+**Zo maak je een vergelijkbaar dashboard:**
+
+1. Open de showcase als visueel voorbeeld en kies welke tabbladen en kaarten je wilt overnemen.
+2. Maak in Home Assistant een nieuw dashboard (bijvoorbeeld met de indeling *Secties*).
+3. Gebruik de [dashboardvoorbeelden](dashboard-recipes.nl.md) of de actie `nl_day_ahead_prices.generate_dashboard_yaml` als basis.
+4. Vervang de voorbeeld-entiteiten door de entity-ID's uit jouw eigen EnerPrice-installatie; voeg waar nodig de gebruikte aangepaste kaarten toe.
+5. Controleer op desktop én mobiel of grafieken, tarieven en advieskaarten goed worden weergegeven.
+
+**Let op:** de showcase is een demonstratie en geen automatische import of kant-en-klare dashboard-YAML. Je eigen leverancier, tarieven, zonnegegevens en sensoren bepalen wat beschikbaar is. De showcasepagina kan andere of actuelere waarden tonen dan de screenshots.
+
 ## Dashboardvoorbeelden
 
 Onderstaande schermafbeeldingen komen uit een bestaande Home Assistant-installatie. Entiteitsnamen, leveranciersprijzen, apparaatinstellingen en meetwaarden verschillen per gebruiker. Dit is een zelf ingericht Home Assistant Sections-dashboard; EnerPrice installeert dit dashboard niet automatisch.
