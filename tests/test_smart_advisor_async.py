@@ -26,9 +26,9 @@ namespace = {
     "asyncio": asyncio,
     "_LOGGER": logging.getLogger(__name__),
 }
-exec(compile(ast.Module(body=[ast.ClassDef(
+exec(compile(ast.fix_missing_locations(ast.Module(body=[ast.ClassDef(
     name="AdvisorWorker", bases=[], keywords=[], body=methods, decorator_list=[]
-)], type_ignores=[]), str(SOURCE), "exec"), namespace)
+)], type_ignores=[])), str(SOURCE), "exec"), namespace)
 AdvisorWorker = namespace["AdvisorWorker"]
 
 
