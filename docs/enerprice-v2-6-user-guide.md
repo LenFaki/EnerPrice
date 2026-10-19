@@ -64,6 +64,20 @@ Enabling a preference alone does not grant consent. Delivery is attempted at mos
 
 Optional energy performance tracking requires **cumulative** import and export energy counters in Wh/kWh, plus a cumulative solar energy counter. Do **not** use daily-reset meters. EnerPrice compares predictions with actual energy only when readings and day boundaries are complete and reliable. Missing evidence stays unknown; the feature does not establish realized financial savings.
 
+## EnerPrice showcase dashboard
+
+Want a dashboard similar to the screenshots? Visit the public **[EnerPrice Showcase dashboard](https://casakors.org/enerprice-showcase/overzicht)** for an example layout covering overview, daily energy advice, solar forecasts, export, settings and data quality.
+
+**Recreate the layout in Home Assistant:**
+
+1. Use the showcase as a visual reference and choose the views and cards you need.
+2. Create a new Home Assistant dashboard (for example, using *Sections*).
+3. Start from the [dashboard recipes](dashboard-recipes.md) or run `nl_day_ahead_prices.generate_dashboard_yaml`.
+4. Replace example entity IDs with your own EnerPrice entities and install any required custom cards.
+5. Check the result on desktop and mobile.
+
+**Note:** the showcase is a demonstration, not a one-click import or downloadable dashboard configuration. Supplier settings, solar data and available entities vary between installations.
+
 ## Dashboard examples
 
 These are example screenshots from a real Home Assistant installation. Sensor names, supplier tariffs, appliance settings and values will differ on your system. The screens use a custom Home Assistant Sections dashboard; EnerPrice does not automatically install this dashboard.
