@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from functools import partial
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -778,6 +780,8 @@ class NLSmartEnergyAdvisorSensor(CoordinatorEntity[NLDayAheadPricesCoordinator],
             "manufacturer": "EnerPrice",
         }
         self._result: dict[str, Any] | None = None
+        self._revision = 0
+        self._task: asyncio.Task | None = None
 
     @property
     def suggested_object_id(self) -> str:
@@ -796,28 +800,58 @@ class NLSmartEnergyAdvisorSensor(CoordinatorEntity[NLDayAheadPricesCoordinator],
             self.async_on_remove(async_track_state_change_event(self.hass, entity_ids, self._async_input_changed))
         daily = getattr(self.coordinator, "daily_forecast", None)
         if daily is not None:
-            self.async_on_remove(daily.async_add_listener(self.async_write_ha_state))
+            self.async_on_remove(daily.async_add_listener(self._request_update))
+        self.async_on_remove(self._cancel_pending)
+        self._request_update()
 
-    def _async_input_changed(self, event: Any) -> None:
-        """Refresh advice on the Home Assistant event loop."""
-        self.hass.loop.call_soon_threadsafe(self.async_write_ha_state)
+    def _handle_coordinator_update(self) -> None:
+        """Never calculate advice in the coordinator's event-loop callback."""
+        self._request_update()
 
     @callback
-    def async_write_ha_state(self) -> None:
-        """Invalidate the snapshot once per write, not between state and attributes."""
-        self._result = None
-        super().async_write_ha_state()
+    def _async_input_changed(self, event: Any) -> None:
+        self._request_update()
 
-    def _current_result(self) -> dict[str, Any]:
-        """Share one calculation between native_value and extra_state_attributes."""
-        if self._result is None:
-            self._result = self._advice()
-        return self._result
+    @callback
+    def _request_update(self) -> None:
+        """Coalesce rapid updates and discard results from obsolete inputs."""
+        self._revision += 1
+        if self._task is None or self._task.done():
+            self._task = self.hass.async_create_task(self._calculate_async())
 
-    def _advice(self) -> dict[str, Any]:
+    @callback
+    def _cancel_pending(self) -> None:
+        self._revision += 1
+        if self._task is not None and not self._task.done():
+            self._task.cancel()
+
+    async def _calculate_async(self) -> None:
+        while True:
+            revision = self._revision
+            # Coalesce updates arriving within the same event-loop turn.
+            await asyncio.sleep(0)
+            if revision != self._revision:
+                continue
+            try:
+                calculate = self._build_calculation()
+                result = await self.hass.async_add_executor_job(calculate)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                _LOGGER.exception("EnerPrice Smart Energy Advisor background calculation failed")
+                if revision == self._revision:
+                    return
+                continue
+            if revision == self._revision:
+                self._result = result
+                self.async_write_ha_state()
+                return
+
+    def _build_calculation(self):
+        """Snapshot Home Assistant state on the event loop, then compute off-loop."""
         data = self.coordinator.data
         if data is None:
-            return {"state": "normal", "recommendation": "Price data is not available."}
+            return lambda: {"state": "normal", "recommendation": "Price data is not available."}
         options = _entry_options(self.entry)
         all_in = _cached_all_in_entries(self.coordinator, data, self.entry)
         now = dt_util.now()
@@ -829,7 +863,8 @@ class NLSmartEnergyAdvisorSensor(CoordinatorEntity[NLDayAheadPricesCoordinator],
             from .daily_advisor import advisor_context
 
             context = advisor_context(self.coordinator)
-        return build_smart_energy_advice(
+        return partial(
+            build_smart_energy_advice,
             electricity_price=current_price(all_in, now),
             future_prices=all_in,
             now=now,
@@ -844,6 +879,10 @@ class NLSmartEnergyAdvisorSensor(CoordinatorEntity[NLDayAheadPricesCoordinator],
             language=language,
             daily_context=context,
         )
+
+    def _current_result(self) -> dict[str, Any]:
+        """Properties only read the latest completed snapshot."""
+        return self._result or {"state": "normal", "recommendation": "Advice is loading."}
 
     @property
     def native_value(self) -> str:
