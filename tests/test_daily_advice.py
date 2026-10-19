@@ -431,10 +431,13 @@ async def test_smart_advisor_subscribes_to_forecast_without_legacy_inputs(monkey
     parent = type(sensor).__mro__[1]
     monkeypatch.setattr(parent, "async_added_to_hass", AsyncMock(), raising=False)
     sensor.async_on_remove = Mock()
-    sensor.async_write_ha_state = Mock()
+    sensor._request_update = Mock()
     await sensor.async_added_to_hass()
-    coordinator.daily_forecast.async_add_listener.assert_called_once_with(sensor.async_write_ha_state)
-    sensor.async_on_remove.assert_called_once_with(coordinator.daily_forecast.async_add_listener.return_value)
+    coordinator.daily_forecast.async_add_listener.assert_called_once_with(sensor._request_update)
+    assert sensor.async_on_remove.call_count == 2
+    sensor.async_on_remove.assert_any_call(coordinator.daily_forecast.async_add_listener.return_value)
+    sensor.async_on_remove.assert_any_call(sensor._cancel_pending)
+    sensor._request_update.assert_called_once_with()
 
 
 def test_daily_advice_cache_hit_skips_utc_price_conversion(monkeypatch):
