@@ -77,25 +77,31 @@ Wil je een dashboard zoals in de screenshots? Bekijk het openbare **[EnerPrice S
 
 ## Dashboardvoorbeelden
 
-Onderstaande schermafbeeldingen komen uit een bestaande Home Assistant-installatie. Entiteitsnamen, leveranciersprijzen, apparaatinstellingen en meetwaarden verschillen per gebruiker. Dit is een zelf ingericht Home Assistant Sections-dashboard; EnerPrice installeert dit dashboard niet automatisch.
+Hieronder zie je zes actuele screenshots van het **EnerPrice Showcase-dashboard**. De indeling is een voorbeeld: prijzen, entiteiten, leveranciersinstellingen en meetwaarden verschillen per installatie. Je kunt het dashboard als inspiratie gebruiken via de [live showcase](https://casakors.org/enerprice-showcase/overzicht).
 
-### Compleet dashboard
+### Overzicht
 
-![EnerPrice dashboard met stroomprijzen, Smart Energy, prijsgrafiek en Dagelijkse Energieadviseur](images/dashboard-compleet.jpg)
+![EnerPrice – Overzicht](images/dashboard-overzicht.jpg)
 
-### Prijsadvies en Smart Energy
+### Dagelijks energieadvies
 
-![EnerPrice prijsadvies en Smart Energy-advies](images/dashboard-prijsadvies-smart-energy.jpg)
+![EnerPrice – Dagelijks energieadvies](images/dashboard-dagelijks-advies.jpg)
 
-### Prijsgrafiek en Dagelijkse Energieadviseur
+### Zonprognose
 
-![EnerPrice prijsgrafiek en beste gebruiksmoment](images/dashboard-prijsgrafiek-dagelijks-advies.jpg)
+![EnerPrice – Zonprognose](images/dashboard-zonprognose.jpg)
 
-### Zonbewust advies
+### Teruglevering
 
-![EnerPrice zonbewust advies en uitleg bij de energiecontrole](images/dashboard-zonbewust-advies.jpg)
+![EnerPrice – Teruglevering](images/dashboard-teruglevering.jpg)
 
-Het netstroomadvies en het voorwaardelijke zonnescenario zijn afzonderlijk. Verwachte voordelen zijn geen bewezen besparingen. De screenshots zijn voorbeelden, geen standaard-entiteitsnamen of gegarandeerde uitkomsten.
+### Instellingen
+
+![EnerPrice – Instellingen](images/dashboard-instellingen.jpg)
+
+### Databronnen en gegevenskwaliteit
+
+![EnerPrice – Databronnen en gegevenskwaliteit](images/dashboard-databronnen.jpg)
 
 ## Dashboard en gebruiksgemak
 
