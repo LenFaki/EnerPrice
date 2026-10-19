@@ -413,3 +413,5 @@ Na het inschakelen van **Smart Setup** maakt EnerPrice een blijvende **Smart Ene
 Controleer vóór gebruik van het advies de invoer in Home Assistant: netvermogen in W met positief = afname en negatief = teruglevering, zonneproductie in W en gasprijs in EUR/m³. Ontbrekende of niet-beschikbare waarden blijven onbekend en worden niet als nul behandeld. V2.5 ondersteunt in Smart Setup één flexibele verbruiker en blijft uitsluitend adviserend; EnerPrice schakelt de verbruiker niet zelf.
 
 Zie [Dashboardvoorbeelden](docs/dashboard-recipes.nl.md) voor een praktische controlevolgorde en dashboardvoorbeelden.
+
+**Zelf een dashboard maken?** Bekijk het [EnerPrice Showcase-dashboard](https://casakors.org/enerprice-showcase/overzicht) als visueel voorbeeld en volg de [stappen in de handleiding](docs/enerprice-v2-6-gebruikershandleiding.md#enerprice-showcase-dashboard).
