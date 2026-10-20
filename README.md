@@ -31,6 +31,43 @@ price analysis, best periods, trends, forecasts and energy advice.
 Slimme day-ahead stroomprijzen, all-in tarieven, kwartierprijzen, analyses en
 energieadvies voor Home Assistant.
 
+## What EnerPrice adds (and what it doesn't)
+
+If you already use a supplier integration such as Zonneplan, you may already
+have the price and energy sensors you need. EnerPrice is **not a replacement**
+for your supplier's integration, nor is it required to automate devices in
+Home Assistant.
+
+Its focus is on turning day-ahead prices and configurable tariff assumptions
+into reusable planning data: for example, finding a lower-cost continuous
+window for a washing machine, dryer, EV charger or boiler. The optional Daily
+Energy Advisor adds a separate, conditional solar-aware scenario when suitable
+forecast and measurement inputs are available. EnerPrice also exposes advice
+and response services that you can use in your own automations.
+
+**Why not just use automation blueprints?** Blueprints are a good way to
+automate devices, and may be all you need. EnerPrice focuses on the
+price/tariff calculations and planning recommendations; Home Assistant
+automations and blueprints can act on those results. Some of these use cases
+can also be built with existing integrations, templates and blueprints.
+
+**Limits:** EnerPrice does not switch devices by itself, does not guarantee
+savings, and cannot predict actual household consumption or solar surplus
+without appropriate inputs. Check supplier-specific tariff settings against
+your own contract.
+
+## Development and AI transparency
+
+EnerPrice is a personal, open-source Home Assistant project developed with
+AI assistance, including help with code, debugging, tests and documentation.
+The maintainer defines the requirements, runs the integration in a real
+Home Assistant setup, reports problems and directs development. AI assistance
+does not guarantee code quality or correctness: please review the code and
+configuration for your own use, and report reproducible issues on
+[GitHub Issues](https://github.com/LenFaki/EnerPrice/issues).
+
+Feedback, bug reports and contributions are welcome.
+
 ## Previously Known As NL Day Ahead Prices
 
 EnerPrice was previously named **NL Day Ahead Prices**. The GitHub repository is now `LenFaki/EnerPrice`, while the Home Assistant
