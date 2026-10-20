@@ -27,6 +27,7 @@ from .price_resolution import infer_price_resolution
 _LOGGER = logging.getLogger(__name__)
 
 ENTSOE_NL_DOMAIN = "10YNL----------L"
+AMSTERDAM_TZ = ZoneInfo("Europe/Amsterdam")
 
 
 class ProviderError(Exception):
@@ -159,9 +160,8 @@ class EnergyChartsProvider(BasePriceProvider):
         )
 
     async def _fetch_day(self, day: date) -> Any:
-        zone = ZoneInfo("Europe/Amsterdam")
-        start = datetime.combine(day, time.min, tzinfo=zone)
-        end = datetime.combine(day + timedelta(days=1), time.min, tzinfo=zone)
+        start = datetime.combine(day, time.min, tzinfo=AMSTERDAM_TZ)
+        end = datetime.combine(day + timedelta(days=1), time.min, tzinfo=AMSTERDAM_TZ)
         return await self._request_json("https://api.energy-charts.info/price", {
             "bzn": self.country, "start": start.isoformat(), "end": end.isoformat(),
         })
@@ -198,9 +198,8 @@ class EntsoeProvider(BasePriceProvider):
         )
 
     async def _fetch_day(self, day: date) -> str:
-        zone = ZoneInfo("Europe/Amsterdam")
-        start = datetime.combine(day, time.min, tzinfo=zone).astimezone(timezone.utc).strftime("%Y%m%d%H%M")
-        end = datetime.combine(day + timedelta(days=1), time.min, tzinfo=zone).astimezone(timezone.utc).strftime("%Y%m%d%H%M")
+        start = datetime.combine(day, time.min, tzinfo=AMSTERDAM_TZ).astimezone(timezone.utc).strftime("%Y%m%d%H%M")
+        end = datetime.combine(day + timedelta(days=1), time.min, tzinfo=AMSTERDAM_TZ).astimezone(timezone.utc).strftime("%Y%m%d%H%M")
         return await self._request_text(
             "https://web-api.tp.entsoe.eu/api",
             {
@@ -274,7 +273,7 @@ def parse_energy_charts(payload: Any, target_day: date) -> list[PriceEntry]:
         )
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
-        if dt.astimezone(ZoneInfo("Europe/Amsterdam")).date() == target_day:
+        if dt.astimezone(AMSTERDAM_TZ).date() == target_day:
             prices.append(PriceEntry(dt, convert_to_eur_kwh(float(value), "EUR/MWh")))
     return sorted(prices, key=lambda entry: entry.time)
 
