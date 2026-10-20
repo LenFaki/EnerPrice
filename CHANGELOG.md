@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.6.7 - 2026-10-20
+
+### Fixed
+- Initialize the Europe/Amsterdam timezone once at module import rather than in async Energy Charts and ENTSO-E provider methods, avoiding potential first-use disk I/O on Home Assistant's event loop (PR #78; HACS review #11476).
+- Reuse the timezone constant when parsing Energy Charts prices.
+
+### Compatibility
+- No changes to entity IDs, settings, provider selection or intended price calculations.
+
+
 ## 2.6.6 - 2026-10-16
 
 ### Fixed
