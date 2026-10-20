@@ -20,6 +20,45 @@ all-in tarieven, prijsanalyses, beste periodes, trends, prognoses en praktisch
 energieadvies. De standaard biedzone is `NL`, de valuta is `EUR` en prijzen
 worden als `EUR/kWh` aangeboden.
 
+## Wat voegt EnerPrice toe (en wat niet)?
+
+Gebruik je al een leveranciersintegratie zoals Zonneplan? Dan heb je mogelijk
+al de prijs- en energiesensoren die je nodig hebt. EnerPrice is **geen
+vervanging** voor de integratie van je energieleverancier en is ook niet
+noodzakelijk om apparaten in Home Assistant te automatiseren.
+
+EnerPrice richt zich op het omzetten van day-ahead prijzen en instelbare
+tarieven naar herbruikbare planningsadviezen. Denk aan het goedkoopste
+aaneengesloten tijdvak voor een wasmachine, droger, EV-lader of boiler. De
+optionele Dagelijkse Energieadviseur kan daarnaast een afzonderlijk,
+voorwaardelijk zonnescenario tonen als de benodigde voorspellingen en metingen
+beschikbaar zijn. De adviezen en acties zijn te gebruiken in je eigen
+automatiseringen.
+
+**Waarom niet alleen automation blueprints?** Blueprints zijn prima geschikt
+om apparaten te automatiseren en kunnen voor jouw situatie voldoende zijn.
+EnerPrice levert vooral de prijsberekeningen en planningsadviezen; Home
+Assistant-automatiseringen en blueprints kunnen die uitkomsten gebruiken.
+Een deel van deze toepassingen is ook mogelijk met bestaande integraties,
+templates en blueprints.
+
+**Beperkingen:** EnerPrice schakelt zelf geen apparaten, garandeert geen
+besparing en kan zonder geschikte invoer geen werkelijk verbruik of
+zonneoverschot voorspellen. Controleer de leveranciersinstellingen met je
+eigen energiecontract.
+
+## Ontwikkeling en transparantie over AI
+
+EnerPrice is een persoonlijk open-sourceproject voor Home Assistant dat met
+hulp van AI wordt ontwikkeld, onder andere bij code, foutopsporing, tests en
+documentatie. De beheerder bepaalt de wensen, test de integratie in een
+eigen Home Assistant-omgeving, meldt problemen en stuurt de ontwikkeling
+aan. AI-hulp is geen garantie voor correcte of veilige code: beoordeel de
+code en configuratie voor je eigen toepassing en meld reproduceerbare
+problemen via [GitHub Issues](https://github.com/LenFaki/EnerPrice/issues).
+
+Feedback, bugmeldingen en bijdragen zijn welkom.
+
 ## Nieuw in EnerPrice 2.6 — Dagelijkse Energieadviseur
 
 De optionele **Dagelijkse Energieadviseur** zoekt het voordeligste moment voor een flexibel apparaat op basis van gepubliceerde stroomprijzen. Met Forecast.Solar, P1 en zonneproductie kan EnerPrice daarnaast een **afzonderlijk voorwaardelijk zonnescenario** berekenen. Je kunt optioneel een dagelijkse melding instellen met expliciete toestemming en voorspellingen vergelijken met betrouwbare cumulatieve energiemetingen. EnerPrice schakelt zelf geen apparaten.
