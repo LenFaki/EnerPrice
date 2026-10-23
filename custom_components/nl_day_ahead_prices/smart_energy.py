@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 from bisect import bisect_right
 from datetime import datetime, time, timedelta, timezone
 from functools import cache
-import logging
 from math import ceil, isfinite
 from time import perf_counter
 from typing import Any
