@@ -14,7 +14,7 @@ Potential savings are not verified realized savings.
 [![Status](https://img.shields.io/badge/status-stable-green.svg?style=flat-square)](https://github.com/LenFaki/EnerPrice)
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=flat-square)](https://hacs.xyz/)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Custom%20Integration-18BCF2?logo=homeassistant&logoColor=white&style=flat-square)](https://www.home-assistant.io/)
-[![Open your Home Assistant instance and open this repository inside HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=LenFaki&repository=home-assistant-nl-day-ahead-prices&category=integration)
+[![Open your Home Assistant instance and open this repository inside HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=LenFaki&repository=EnerPrice&category=integration)
 [![Tests](https://github.com/LenFaki/EnerPrice/actions/workflows/ci.yml/badge.svg)](https://github.com/LenFaki/EnerPrice/actions/workflows/ci.yml)
 [![HACS validation](https://github.com/LenFaki/EnerPrice/actions/workflows/hacs.yml/badge.svg)](https://github.com/LenFaki/EnerPrice/actions/workflows/hacs.yml)
 [![Hassfest](https://github.com/LenFaki/EnerPrice/actions/workflows/hassfest.yml/badge.svg)](https://github.com/LenFaki/EnerPrice/actions/workflows/hassfest.yml)
