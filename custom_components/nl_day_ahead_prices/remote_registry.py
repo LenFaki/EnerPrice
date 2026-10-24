@@ -36,7 +36,7 @@ from .registry_validation import (
 )
 from .supplier_registry import SupplierRegistry, activate_remote_registry, load_registry
 
-REMOTE_REGISTRY_URL = "https://raw.githubusercontent.com/LenFaki/home-assistant-nl-day-ahead-prices/main/registry/supplier_tariffs.json"
+REMOTE_REGISTRY_URL = "https://raw.githubusercontent.com/LenFaki/EnerPrice/main/registry/supplier_tariffs.json"
 REMOTE_CHECK_INTERVAL = timedelta(hours=24)
 REMOTE_TIMEOUT_SECONDS = 20
 MAX_REGISTRY_BYTES = 1_048_576
