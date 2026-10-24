@@ -7,7 +7,7 @@ from bisect import bisect_right
 from datetime import datetime, time, timedelta, timezone
 from functools import cache
 from math import ceil, isfinite
-from time import perf_counter
+from time import perf_counter, process_time
 from typing import Any
 
 from .models import PriceEntry
@@ -230,7 +230,10 @@ def _daily_advice(prices, now, context, power_w, language):
     A point-in-time measurement never becomes a claim of future measured surplus.
     """
     started = perf_counter()
+    cpu_started = process_time()
     chart_ms = grid_ms = solar_ms = 0.0
+    chart_cpu_ms = 0.0
+    chart_day_ms = []
     chart_calls = 0
     chart_interpolation_ms = 0.0
     nl = language.lower().startswith("nl")
@@ -292,13 +295,16 @@ def _daily_advice(prices, now, context, power_w, language):
                  "expected_intervals": len(stamps), "solar_energy_kwh": solar_days.get(day.isoformat(), {}).get("energy_kwh"),
                  "solar_status": solar_days.get(day.isoformat(), {}).get("status", "missing"), "window": None}
         chart_started = perf_counter()
+        chart_cpu_started = process_time()
         for stamp in stamps:
             interpolation_started = perf_counter()
             solar_w = power_at(stamp.timestamp())
             chart_interpolation_ms += (perf_counter() - interpolation_started) * 1000
             chart_calls += 1
             chart.append({"time": stamp.isoformat(), "price": price_map.get(stamp), "solar_kw": solar_w / 1000 if solar_w is not None else None})
-        chart_ms += (perf_counter() - chart_started) * 1000
+        chart_day_ms.append(round((perf_counter() - chart_started) * 1000, 1))
+        chart_ms += chart_day_ms[-1]
+        chart_cpu_ms += (process_time() - chart_cpu_started) * 1000
         # Never optimize across a missing price interval or extend the last known price.
         complete = future and all(stamp in price_map for stamp in future)
         if complete:
@@ -354,16 +360,19 @@ def _daily_advice(prices, now, context, power_w, language):
     grid_windows = [day["window"] for day in days if day["window"]]
     best = min(grid_windows, key=lambda item: item["average_price_eur_kwh"], default=None)
     total_ms = (perf_counter() - started) * 1000
+    cpu_ms = (process_time() - cpu_started) * 1000
     if total_ms >= 250:
         _LOGGER.warning(
             "EnerPrice Daily Advisor planning took %.1f ms "
             "(chart: %.1f ms, grid optimization: %.1f ms, "
             "solar optimization: %.1f ms, other: %.1f ms; resolution: %d min; "
             "forecast preparation: %.1f ms, forecast points: %d, "
-            "chart intervals: %d, chart interpolation: %.1f ms).",
+            "chart intervals: %d, chart interpolation: %.1f ms; "
+            "process CPU: %.1f ms, chart process CPU: %.1f ms, chart days: %s ms).", 
             total_ms, chart_ms, grid_ms, solar_ms,
             max(0.0, total_ms - chart_ms - grid_ms - solar_ms), minutes,
             forecast_ms, forecast_points, chart_calls, chart_interpolation_ms,
+            cpu_ms, chart_cpu_ms, chart_day_ms,
         )
     return {
         "state": "ready" if best else "unavailable", "best_window": best, "days": days,
