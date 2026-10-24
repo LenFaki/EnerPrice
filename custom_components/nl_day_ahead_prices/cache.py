@@ -5,13 +5,14 @@ from __future__ import annotations
 from datetime import date, datetime, time, timedelta, timezone
 from math import isfinite
 from typing import Any
-from zoneinfo import ZoneInfo
+
+from .solar_forecast import AMSTERDAM
 
 
 def get_cached_prices_for_date(cached: dict[str, Any] | None, target_date: date) -> dict[str, Any]:
     """Select valid intervals by Amsterdam date, independently of cache labels."""
     cached = cached or {}
-    zone = ZoneInfo("Europe/Amsterdam")
+    zone = AMSTERDAM
 
     def select(keys):
         entries = {}
@@ -63,4 +64,4 @@ def get_cached_prices_for_date(cached: dict[str, Any] | None, target_date: date)
 
 def cache_is_valid(cached: dict[str, Any] | None, now: datetime) -> bool:
     """Accept cached intervals belonging to the current market date."""
-    return bool(get_cached_prices_for_date(cached, now.astimezone(ZoneInfo("Europe/Amsterdam")).date())["prices"])
+    return bool(get_cached_prices_for_date(cached, now.astimezone(AMSTERDAM).date())["prices"])
