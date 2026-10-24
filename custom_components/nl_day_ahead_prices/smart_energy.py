@@ -231,6 +231,8 @@ def _daily_advice(prices, now, context, power_w, language):
     """
     started = perf_counter()
     chart_ms = grid_ms = solar_ms = 0.0
+    chart_calls = 0
+    chart_interpolation_ms = 0.0
     nl = language.lower().startswith("nl")
     now = now.astimezone(timezone.utc)
     forecast = context.get("forecast", {})
@@ -244,7 +246,10 @@ def _daily_advice(prices, now, context, power_w, language):
     price_map = {item.time.astimezone(timezone.utc): item.price for item in prices if isfinite(item.price)}
     export_map = {item.time.astimezone(timezone.utc): item.price for item in context.get("export_prices", []) if isfinite(item.price)}
     solar_days = {day["date"]: day for day in forecast.get("days", [])}
+    forecast_started = perf_counter()
     series = _power_series(forecast)
+    forecast_ms = (perf_counter() - forecast_started) * 1000
+    forecast_points = sum(len(points) for points in series)
     # Forecast knots and interval boundaries recur across chart and solar integration.
     # Keep the memoization scoped to this calculation: no stale forecast values.
     power_at = cache(lambda stamp: _power_at(series, stamp))
@@ -288,7 +293,10 @@ def _daily_advice(prices, now, context, power_w, language):
                  "solar_status": solar_days.get(day.isoformat(), {}).get("status", "missing"), "window": None}
         chart_started = perf_counter()
         for stamp in stamps:
+            interpolation_started = perf_counter()
             solar_w = power_at(stamp.timestamp())
+            chart_interpolation_ms += (perf_counter() - interpolation_started) * 1000
+            chart_calls += 1
             chart.append({"time": stamp.isoformat(), "price": price_map.get(stamp), "solar_kw": solar_w / 1000 if solar_w is not None else None})
         chart_ms += (perf_counter() - chart_started) * 1000
         # Never optimize across a missing price interval or extend the last known price.
@@ -350,9 +358,12 @@ def _daily_advice(prices, now, context, power_w, language):
         _LOGGER.warning(
             "EnerPrice Daily Advisor planning took %.1f ms "
             "(chart: %.1f ms, grid optimization: %.1f ms, "
-            "solar optimization: %.1f ms, other: %.1f ms; resolution: %d min).",
+            "solar optimization: %.1f ms, other: %.1f ms; resolution: %d min; "
+            "forecast preparation: %.1f ms, forecast points: %d, "
+            "chart intervals: %d, chart interpolation: %.1f ms).",
             total_ms, chart_ms, grid_ms, solar_ms,
             max(0.0, total_ms - chart_ms - grid_ms - solar_ms), minutes,
+            forecast_ms, forecast_points, chart_calls, chart_interpolation_ms,
         )
     return {
         "state": "ready" if best else "unavailable", "best_window": best, "days": days,
