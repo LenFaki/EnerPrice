@@ -64,27 +64,47 @@ Enabling a preference alone does not grant consent. Delivery is attempted at mos
 
 Optional energy performance tracking requires **cumulative** import and export energy counters in Wh/kWh, plus a cumulative solar energy counter. Do **not** use daily-reset meters. EnerPrice compares predictions with actual energy only when readings and day boundaries are complete and reliable. Missing evidence stays unknown; the feature does not establish realized financial savings.
 
+## EnerPrice showcase dashboard
+
+Want a dashboard similar to the screenshots? Visit the public **[EnerPrice Showcase dashboard](https://casakors.org/enerprice-showcase/overzicht)** for an example layout covering overview, daily energy advice, solar forecasts, export, settings and data quality.
+
+**Recreate the layout in Home Assistant:**
+
+1. Use the showcase as a visual reference and choose the views and cards you need.
+2. Create a new Home Assistant dashboard (for example, using *Sections*).
+3. Start from the [dashboard recipes](dashboard-recipes.md) or run `nl_day_ahead_prices.generate_dashboard_yaml`.
+4. Replace example entity IDs with your own EnerPrice entities and install any required custom cards.
+5. Check the result on desktop and mobile.
+
+**Note:** the showcase is a demonstration, not a one-click import or downloadable dashboard configuration. Supplier settings, solar data and available entities vary between installations.
+
 ## Dashboard examples
 
-These are example screenshots from a real Home Assistant installation. Sensor names, supplier tariffs, appliance settings and values will differ on your system. The screens use a custom Home Assistant Sections dashboard; EnerPrice does not automatically install this dashboard.
+Below are six updated screenshots from the **EnerPrice Showcase dashboard**. The layout is an example; prices, entities, supplier settings and measured values vary between installations. Explore the [live showcase](https://casakors.org/enerprice-showcase/overzicht) for inspiration.
 
-### Full dashboard
+### Overview
 
-![EnerPrice dashboard with prices, Smart Energy, chart and Daily Energy Advisor](images/dashboard-compleet.jpg)
+![EnerPrice – Overview](images/dashboard-overzicht.jpg)
 
-### Price advice and Smart Energy
+### Daily energy advice
 
-![EnerPrice price advice and Smart Energy Advisor](images/dashboard-prijsadvies-smart-energy.jpg)
+![EnerPrice – Daily energy advice](images/dashboard-dagelijks-advies.jpg)
 
-### Price chart and Daily Energy Advisor
+### Solar forecast
 
-![EnerPrice day-ahead price chart and daily consumption advice](images/dashboard-prijsgrafiek-dagelijks-advies.jpg)
+![EnerPrice – Solar forecast](images/dashboard-zonprognose.jpg)
 
-### Solar-aware advice
+### Export and feed-in
 
-![EnerPrice solar-aware advice and energy-check explanation](images/dashboard-zonbewust-advies.jpg)
+![EnerPrice – Export and feed-in](images/dashboard-teruglevering.jpg)
 
-The grid-only recommendation and conditional solar scenario are separate; forecast savings are not verified realized savings. Screenshots illustrate one configuration, not default entity IDs or guaranteed results.
+### Settings
+
+![EnerPrice – Settings](images/dashboard-instellingen.jpg)
+
+### Data sources and quality
+
+![EnerPrice – Data sources and quality](images/dashboard-databronnen.jpg)
 
 ## Dashboards and a simple setup path
 
