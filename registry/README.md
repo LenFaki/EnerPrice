@@ -14,6 +14,10 @@ The integration version remains unchanged for this infrastructure PR.
 - Optional `published_at` is an explicit UTC ISO-8601 publication timestamp.
   It is not a supplier verification date or contract effective date.
 - `country: NL` and `currency: EUR` are fixed. Fees use EUR/kWh and EUR/month.
+- Revision 3 started using the optional `export_market_vat_included` field, so
+  receiving revision 3 and later requires EnerPrice 2.6.5 or later. Older
+  versions reject the whole registry, keep their last accepted data and report
+  `validation_error`. Any new optional field raises the minimum version the same way.
 - `supplier_tariffs.schema.json` describes structural requirements. Runtime
   validation additionally checks period ordering, overlap, finite numbers and
   source URL semantics. Use the runtime validator as the final authority.

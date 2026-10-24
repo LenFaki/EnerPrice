@@ -36,9 +36,10 @@ flags only concern the fees. The optional `export_market_vat_included` (default
 `true`) states whether the supplier pays VAT on the *market price* of exported
 energy; when `false`, the sell price is `market - export_fee` instead of
 `market * (1 + vat) - export_fee`. Registries without the field remain valid.
-Released clients before this field reject unknown tariff fields, so the remote
-registry may only start using it in a later revision, after clients that accept
-it have been rolled out. Monthly
+The remote registry uses it from revision 3 (Pure Energie). EnerPrice versions
+before 2.6.5 reject unknown tariff fields, so they reject revision 3 and every
+later revision: they keep their last accepted data, report `validation_error`
+and receive no remote updates until upgraded to 2.6.5 or later. Monthly
 fees are stored including VAT and are not added to per-kWh all-in prices.
 `feed_in_fee` and `imbalance_fee` retain the existing VAT-inclusive semantics.
 Negative export fees remain supported. The adapter populates existing v1/v2
@@ -259,8 +260,9 @@ If fees differ from your contract, inspect the tariff's `last_verified`, source
 and VAT flags; use Custom for contract-specific values. A downloaded revision
 does not mean all supplier fees were freshly verified. On `network_error` or
 `http_error`, the last good local data remains usable and the next daily check
-retries. On `validation_error`, maintainers must correct the published registry;
-on `storage_error`, check HA storage availability. Switching modes is not a way
+retries. On `validation_error`, upgrade first if you run EnerPrice before 2.6.5,
+which cannot read registry revision 3 and later; otherwise maintainers must
+correct the published registry. On `storage_error`, check HA storage availability. Switching modes is not a way
 to bypass the daily request limit. All-Bundled mode performs no registry HTTP.
 
 No new price-array schema, services, tariff amounts, scraping, audit automation
