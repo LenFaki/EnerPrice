@@ -346,6 +346,10 @@ Two enabled diagnostic entities on the existing EnerPrice device show
 Status** (`remote`, `cached_remote` or `bundled`). They remain available when
 market APIs fail. See [registry modes and troubleshooting](docs/supplier-tariff-registry.md#home-assistant-ux-pr2).
 
+Automatic updates from registry revision 3 onward require EnerPrice 2.6.5 or
+later. Older versions keep their last accepted tariff data, and Supplier Registry
+Status reports `last_check_result: validation_error`, until you upgrade.
+
 When you select a built-in supplier, the next screen shows the profile values
 that will be used for the all-in calculation: purchase fee, monthly fee,
 verification date, and source URL. When you select **Custom supplier**, the next

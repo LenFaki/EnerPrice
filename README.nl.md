@@ -263,6 +263,10 @@ Diagnostische entiteiten tonen de versheid en herkomst van het actieve
 leverancierstarief en of het register uit `remote`, `cached_remote` of
 `bundled` komt.
 
+Automatische updates vanaf registerrevisie 3 vereisen EnerPrice 2.6.5 of nieuwer.
+Oudere versies houden hun laatst geaccepteerde tariefgegevens en Supplier
+Registry Status meldt `last_check_result: validation_error`, totdat je bijwerkt.
+
 Leverancierstarieven kunnen wijzigen en per contract verschillen. Controleer
 daarom je actuele contract of tariefblad wanneer nauwkeurigheid belangrijk is.
 

@@ -36,9 +36,10 @@ flags only concern the fees. The optional `export_market_vat_included` (default
 `true`) states whether the supplier pays VAT on the *market price* of exported
 energy; when `false`, the sell price is `market - export_fee` instead of
 `market * (1 + vat) - export_fee`. Registries without the field remain valid.
-Released clients before this field reject unknown tariff fields, so the remote
-registry may only start using it in a later revision, after clients that accept
-it have been rolled out. Monthly
+The remote registry uses it from revision 3 (Pure Energie). EnerPrice versions
+before 2.6.5 reject unknown tariff fields, so they reject revision 3 and every
+later revision: they keep their last accepted data, report `validation_error`
+and receive no remote updates until upgraded to 2.6.5 or later. Monthly
 fees are stored including VAT and are not added to per-kWh all-in prices.
 `feed_in_fee` and `imbalance_fee` retain the existing VAT-inclusive semantics.
 Negative export fees remain supported. The adapter populates existing v1/v2
@@ -78,7 +79,7 @@ historical contract prices.
 | SamSam | [Official tariffs](https://samsam.nu/groene-energie) confirms EUR 0.021118/kWh including VAT, EUR 7.99/month per connection and hourly electricity. Corrected import from the observation date; historical EUR 0.0339 remains intact. Export EUR 0.0339 is unverified legacy data, not an official current amount. |
 | Eneco | [Dynamic tariffs](https://www.eneco.nl/duurzame-energie/dynamisch-energiecontract/dynamische-tarieven/) explains the mechanism without establishing exact universal current fees. EUR 0.0241/kWh and EUR 7/month retain secondary provenance and their old verification date. |
 | Vattenfall | [FlexPrijs with solar panels](https://www.vattenfall.nl/energie/dynamisch-energiecontract/zonnepanelen/) reviewed on 2026-09-23 did not establish a complete replacement tariff, its actual effective date and the exact mapping to EnerPrice's export-fee semantics. The single legacy record remains secondary/unverified: EUR 0.0255/kWh import and export, EUR 7.95/month. No new validity boundary or verification date. |
-| Pure Energie | [Fee explanation](https://pure-energie.nl/kennisbank/inkoop-en-verkoopvergoeding-dynamisch-contract/) explains the components, but does not establish current universal amounts. Retain contributed values, including the export sign, pending contract verification. |
+| Pure Energie | [Fee explanation](https://pure-energie.nl/kennisbank/inkoop-en-verkoopvergoeding-dynamisch-contract/) explains the components, but does not establish current universal amounts. On 2026-10-12 live customer prices (market EUR 0.18737, sell EUR 0.17438) showed that Pure Energie pays the market price excluding VAT minus EUR 0.01299/kWh; the export fee is now positive with `export_market_vat_included: false`. Other amounts retained pending contract verification. |
 
 For easyEnergy, Greenchoice and SamSam newly observed values take effect in the registry
 on the review date, rather than backdating an unknown effective date. No
@@ -259,8 +260,9 @@ If fees differ from your contract, inspect the tariff's `last_verified`, source
 and VAT flags; use Custom for contract-specific values. A downloaded revision
 does not mean all supplier fees were freshly verified. On `network_error` or
 `http_error`, the last good local data remains usable and the next daily check
-retries. On `validation_error`, maintainers must correct the published registry;
-on `storage_error`, check HA storage availability. Switching modes is not a way
+retries. On `validation_error`, upgrade first if you run EnerPrice before 2.6.5,
+which cannot read registry revision 3 and later; otherwise maintainers must
+correct the published registry. On `storage_error`, check HA storage availability. Switching modes is not a way
 to bypass the daily request limit. All-Bundled mode performs no registry HTTP.
 
 No new price-array schema, services, tariff amounts, scraping, audit automation

@@ -15,7 +15,10 @@ import pytest
 from custom_components.nl_day_ahead_prices import registry_validation as validation
 from custom_components.nl_day_ahead_prices import remote_registry as remote
 from custom_components.nl_day_ahead_prices import supplier_registry as registry
-from custom_components.nl_day_ahead_prices.calculations import build_all_in_price_attributes_for_supplier
+from custom_components.nl_day_ahead_prices.calculations import (
+    build_all_in_price_attributes_for_supplier,
+    calculate_sell_price,
+)
 from custom_components.nl_day_ahead_prices.models import PriceEntry, ProviderResult
 
 NOW = datetime(2026, 9, 23, 12, tzinfo=timezone.utc)
@@ -247,11 +250,14 @@ def test_initial_remote_data_exactly_matches_bundle():
     bundled = json.loads(registry.REGISTRY_FILE.read_text())
     assert candidate["suppliers"] == bundled["suppliers"]
     assert remote.parse_remote_registry(candidate).revision == 1
-    assert remote.parse_remote_registry(candidate).suppliers["pure_energie"][0].purchase_fee_export == -0.01299
 
 
 def test_export_market_vat_flag_defaults_to_included():
-    parsed = remote.parse_remote_registry(payload())
+    candidate = payload()
+    for supplier in candidate["suppliers"].values():
+        for record in supplier["tariffs"]:
+            record.pop("export_market_vat_included", None)
+    parsed = remote.parse_remote_registry(candidate)
     assert all(p.sell_market_price_includes_vat for profiles in parsed.suppliers.values() for p in profiles)
 
 
@@ -263,15 +269,19 @@ def test_export_market_vat_flag_is_accepted_when_present():
     assert parsed.suppliers["anwb_energie"][0].sell_market_price_includes_vat
 
 
-def test_published_registry_does_not_use_export_market_vat_flag_yet():
-    # Released clients require the exact v1 field set and would reject the
-    # whole remote registry. Publish the field only in a separate registry
-    # revision once clients that accept it have been rolled out.
-    for path in (ROOT / "registry/supplier_tariffs.json", registry.REGISTRY_FILE):
-        data = json.loads(path.read_text())
-        for supplier in data["suppliers"].values():
-            for record in supplier["tariffs"]:
-                assert "export_market_vat_included" not in record, path
+@pytest.mark.parametrize("cached", [False, True])
+async def test_published_registry_keeps_pure_energie_sell_price_fix(cached):
+    # Automatic mode activates any remote revision above the bundled one, from
+    # cache or download, so the published registry must carry the corrected
+    # Pure Energie export terms too. Live prices on 2026-10-12: market 0.18737, sell 0.17438.
+    published = json.loads((ROOT / "registry/supplier_tariffs.json").read_text())["revision"]
+    manager, _, _ = setup(published if cached else None, published)
+    await manager.async_load()
+    await manager.async_check()
+    profile = registry.get_supplier_tariff(
+        "pure_energie", datetime(2026, 10, 12, tzinfo=timezone.utc), mode=registry.SUPPLIER_UPDATES_AUTOMATIC
+    )
+    assert calculate_sell_price(0.18737, profile, 0.21) == pytest.approx(0.17438)
 
 
 def test_unknown_tariff_field_is_still_rejected():
