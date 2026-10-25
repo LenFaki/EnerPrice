@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import gc
 import logging
+from threading import get_ident
 from bisect import bisect_right
 from datetime import datetime, time, timedelta, timezone
 from functools import cache
@@ -225,6 +226,49 @@ def _round(value: float | None) -> float | None:
 
 
 def _daily_advice(prices, now, context, power_w, language):
+    """Profile GC pauses on the calling thread during Daily Advisor planning."""
+    owner_thread = get_ident()
+    started = perf_counter()
+    gc_started = {}
+    gc_wall_ms = [0.0, 0.0, 0.0]
+    gc_cpu_ms = [0.0, 0.0, 0.0]
+    gc_events = [0, 0, 0]
+
+    def gc_callback(phase, info):
+        # GC callbacks are process-wide; only measure this invocation's thread.
+        if get_ident() != owner_thread:
+            return
+        generation = info.get("generation")
+        if generation not in (0, 1, 2):
+            return
+        if phase == "start":
+            gc_started[generation] = (perf_counter(), thread_time())
+        elif phase == "stop":
+            times = gc_started.pop(generation, None)
+            if times is not None:
+                gc_wall_ms[generation] += (perf_counter() - times[0]) * 1000
+                gc_cpu_ms[generation] += (thread_time() - times[1]) * 1000
+                gc_events[generation] += 1
+
+    gc.callbacks.append(gc_callback)
+    try:
+        return _daily_advice_impl(prices, now, context, power_w, language)
+    finally:
+        gc.callbacks.remove(gc_callback)
+        elapsed_ms = (perf_counter() - started) * 1000
+        if elapsed_ms >= 250:
+            _LOGGER.warning(
+                "EnerPrice Daily Advisor GC profile: elapsed %.1f ms; "
+                "GC wall ms by generation: %s; GC thread CPU ms by generation: %s; "
+                "GC events by generation: %s.",
+                elapsed_ms,
+                tuple(round(value, 1) for value in gc_wall_ms),
+                tuple(round(value, 1) for value in gc_cpu_ms),
+                tuple(gc_events),
+            )
+
+
+def _daily_advice_impl(prices, now, context, power_w, language):
     """Add calendar-day planning to the existing advisor, using its shared optimizer.
 
     Grid-only windows and conditional solar alternatives remain separate models.
