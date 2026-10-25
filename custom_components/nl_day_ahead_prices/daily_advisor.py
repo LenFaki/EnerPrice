@@ -71,6 +71,15 @@ def advisor_context(coordinator):
             "resolution_minutes": 15 if data and data.result.effective_price_resolution == "quarter_hour" else 60}
 
 
+def _advice_time_bucket(now):
+    """Refresh at most every five minutes unless source data changes.
+
+    Five minutes is the maximum measurement age accepted by solar advice.
+    Forecast and price updates still invalidate the cached result immediately.
+    """
+    return int(now.timestamp() // 300)
+
+
 def daily_advice(coordinator, language=None):
     """One cached result shared by the new Daily Advisor entities."""
     from .sensor import _cached_all_in_entries
@@ -82,7 +91,7 @@ def daily_advice(coordinator, language=None):
         language = coordinator.hass.config.language
     now = dt_util.utcnow()
     prices = _cached_all_in_entries(coordinator, coordinator.data, coordinator.entry) if coordinator.data else []
-    signature = (id(prices), id(coordinator.daily_forecast.data), int(now.timestamp() // 60), repr(options), language)
+    signature = (id(prices), id(coordinator.daily_forecast.data), _advice_time_bucket(now), repr(options), language)
     cache = getattr(coordinator, "analysis_cache", {})
     if cache.get("daily_advice", (None,))[0] != signature:
         # Conversion is only needed on a cache miss. Home Assistant reads
