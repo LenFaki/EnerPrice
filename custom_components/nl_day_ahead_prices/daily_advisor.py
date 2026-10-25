@@ -14,7 +14,6 @@ from homeassistant.helpers.event import async_track_state_change_event, async_tr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
-from .daily_cache import advice_time_bucket
 from .const import (
     CONF_ADVICE_LANGUAGE,
     CONF_DAILY_CONSUMPTION_ENTITIES,
@@ -28,6 +27,7 @@ from .const import (
     CONF_FLEXIBLE_LOAD_POWER_W,
     DOMAIN,
 )
+from .daily_cache import advice_time_bucket
 from .solar_forecast import (
     AMSTERDAM,
     ENERGY_UNITS,
