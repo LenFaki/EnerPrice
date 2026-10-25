@@ -309,7 +309,7 @@ def _daily_advice(prices, now, context, power_w, language):
         chart_day_ms.append(round((perf_counter() - chart_started) * 1000, 1))
         chart_ms += chart_day_ms[-1]
         chart_cpu_ms += (thread_time() - chart_cpu_started) * 1000
-        chart_day_gc.append(tuple(generation["collections"] - before for generation, before in zip(gc.get_stats(), chart_gc_before)))
+        chart_day_gc.append(tuple(generation["collections"] - before for generation, before in zip(gc.get_stats(), chart_gc_before, strict=True)))
         # Never optimize across a missing price interval or extend the last known price.
         complete = future and all(stamp in price_map for stamp in future)
         if complete:
@@ -366,7 +366,7 @@ def _daily_advice(prices, now, context, power_w, language):
     best = min(grid_windows, key=lambda item: item["average_price_eur_kwh"], default=None)
     total_ms = (perf_counter() - started) * 1000
     cpu_ms = (thread_time() - cpu_started) * 1000
-    gc_counts = tuple(generation["collections"] - before for generation, before in zip(gc.get_stats(), gc_before))
+    gc_counts = tuple(generation["collections"] - before for generation, before in zip(gc.get_stats(), gc_before, strict=True))
     if total_ms >= 250:
         _LOGGER.warning(
             "EnerPrice Daily Advisor planning took %.1f ms "
