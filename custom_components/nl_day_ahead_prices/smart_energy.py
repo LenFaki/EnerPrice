@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import logging
 from bisect import bisect_right
 from datetime import datetime, time, timedelta, timezone
@@ -231,9 +232,11 @@ def _daily_advice(prices, now, context, power_w, language):
     """
     started = perf_counter()
     cpu_started = thread_time()
+    gc_before = tuple(generation["collections"] for generation in gc.get_stats())
     chart_ms = grid_ms = solar_ms = 0.0
     chart_cpu_ms = 0.0
     chart_day_ms = []
+    chart_day_gc = []
     chart_calls = 0
     chart_interpolation_ms = 0.0
     nl = language.lower().startswith("nl")
@@ -296,6 +299,7 @@ def _daily_advice(prices, now, context, power_w, language):
                  "solar_status": solar_days.get(day.isoformat(), {}).get("status", "missing"), "window": None}
         chart_started = perf_counter()
         chart_cpu_started = thread_time()
+        chart_gc_before = tuple(generation["collections"] for generation in gc.get_stats())
         for stamp in stamps:
             interpolation_started = perf_counter()
             solar_w = power_at(stamp.timestamp())
@@ -305,6 +309,7 @@ def _daily_advice(prices, now, context, power_w, language):
         chart_day_ms.append(round((perf_counter() - chart_started) * 1000, 1))
         chart_ms += chart_day_ms[-1]
         chart_cpu_ms += (thread_time() - chart_cpu_started) * 1000
+        chart_day_gc.append(tuple(generation["collections"] - before for generation, before in zip(gc.get_stats(), chart_gc_before)))
         # Never optimize across a missing price interval or extend the last known price.
         complete = future and all(stamp in price_map for stamp in future)
         if complete:
@@ -361,6 +366,7 @@ def _daily_advice(prices, now, context, power_w, language):
     best = min(grid_windows, key=lambda item: item["average_price_eur_kwh"], default=None)
     total_ms = (perf_counter() - started) * 1000
     cpu_ms = (thread_time() - cpu_started) * 1000
+    gc_counts = tuple(generation["collections"] - before for generation, before in zip(gc.get_stats(), gc_before))
     if total_ms >= 250:
         _LOGGER.warning(
             "EnerPrice Daily Advisor planning took %.1f ms "
@@ -368,11 +374,12 @@ def _daily_advice(prices, now, context, power_w, language):
             "solar optimization: %.1f ms, other: %.1f ms; resolution: %d min; "
             "forecast preparation: %.1f ms, forecast points: %d, "
             "chart intervals: %d, chart interpolation: %.1f ms; "
-            "thread CPU: %.1f ms, chart thread CPU: %.1f ms, chart days: %s ms).", 
+            "thread CPU: %.1f ms, chart thread CPU: %.1f ms, chart days: %s ms; "
+            "GC collections by generation: %s, chart day GC: %s).", 
             total_ms, chart_ms, grid_ms, solar_ms,
             max(0.0, total_ms - chart_ms - grid_ms - solar_ms), minutes,
             forecast_ms, forecast_points, chart_calls, chart_interpolation_ms,
-            cpu_ms, chart_cpu_ms, chart_day_ms,
+            cpu_ms, chart_cpu_ms, chart_day_ms, gc_counts, chart_day_gc,
         )
     return {
         "state": "ready" if best else "unavailable", "best_window": best, "days": days,
