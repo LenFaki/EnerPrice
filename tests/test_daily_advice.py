@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from custom_components.nl_day_ahead_prices.calculations import export_entries_for_supplier
+from custom_components.nl_day_ahead_prices.daily_cache import advice_time_bucket
 from custom_components.nl_day_ahead_prices.dashboard import generate_dashboard_yaml
 from custom_components.nl_day_ahead_prices.models import PriceEntry
 from custom_components.nl_day_ahead_prices.smart_energy import (
@@ -554,3 +555,9 @@ def test_solar_integral_cached_and_uncached_are_identical():
             series, 0, 3600, baseline, power, power_at=cached
         )
     assert _solar_load_energy(series, 3600, 4500, 500, 1000, power_at=cached) is None
+
+
+def test_daily_advice_time_bucket_limits_recomputation_to_five_minutes():
+    start = datetime(2026, 10, 25, 13, 0, tzinfo=timezone.utc)
+    assert advice_time_bucket(start) == advice_time_bucket(start + timedelta(minutes=4, seconds=59))
+    assert advice_time_bucket(start) != advice_time_bucket(start + timedelta(minutes=5))

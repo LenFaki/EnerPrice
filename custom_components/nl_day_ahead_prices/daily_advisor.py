@@ -27,6 +27,7 @@ from .const import (
     CONF_FLEXIBLE_LOAD_POWER_W,
     DOMAIN,
 )
+from .daily_cache import advice_time_bucket
 from .solar_forecast import (
     AMSTERDAM,
     ENERGY_UNITS,
@@ -82,7 +83,7 @@ def daily_advice(coordinator, language=None):
         language = coordinator.hass.config.language
     now = dt_util.utcnow()
     prices = _cached_all_in_entries(coordinator, coordinator.data, coordinator.entry) if coordinator.data else []
-    signature = (id(prices), id(coordinator.daily_forecast.data), int(now.timestamp() // 60), repr(options), language)
+    signature = (id(prices), id(coordinator.daily_forecast.data), advice_time_bucket(now), repr(options), language)
     cache = getattr(coordinator, "analysis_cache", {})
     if cache.get("daily_advice", (None,))[0] != signature:
         # Conversion is only needed on a cache miss. Home Assistant reads
