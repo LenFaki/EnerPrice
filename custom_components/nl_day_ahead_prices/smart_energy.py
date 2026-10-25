@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import gc
 import logging
-from threading import get_ident
 from bisect import bisect_right
 from datetime import datetime, time, timedelta, timezone
 from functools import cache
 from math import ceil, isfinite
+from threading import get_ident
 from time import perf_counter, thread_time
 from typing import Any
 
