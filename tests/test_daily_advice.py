@@ -9,8 +9,8 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from custom_components.nl_day_ahead_prices.calculations import export_entries_for_supplier
-from custom_components.nl_day_ahead_prices.dashboard import generate_dashboard_yaml
 from custom_components.nl_day_ahead_prices.daily_advisor import _advice_time_bucket
+from custom_components.nl_day_ahead_prices.dashboard import generate_dashboard_yaml
 from custom_components.nl_day_ahead_prices.models import PriceEntry
 from custom_components.nl_day_ahead_prices.smart_energy import (
     _solar_load_energy,
