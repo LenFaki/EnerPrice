@@ -24,6 +24,8 @@ def test_gc_profile_records_collected_objects_and_unregisters(caplog):
     assert "counters before/after" in caplog.text
     assert "cumulative collections delta" in caplog.text
     assert "peak RSS MiB before/after" in caplog.text
+    assert "GC trigger context:" in caplog.text
+    assert "net snapshots, not total allocations" in caplog.text
 
 
 def test_gc_profile_always_unregisters_after_exception():
@@ -48,8 +50,8 @@ def test_gc_pressure_uses_bounded_counters_without_scanning_objects(monkeypatch)
     logger = Mock()
     with advisor_gc.profile_advisor_gc("Smart Energy Advisor", logger, threshold_ms=0):
         pass
-    assert logger.warning.call_count == 2
-    assert "GC pressure" in logger.warning.call_args.args[0]
+    assert logger.warning.call_count == 3
+    assert "GC trigger context" in logger.warning.call_args.args[0]
 
 
 def test_peak_rss_is_optional_when_resource_is_unavailable(monkeypatch):
@@ -60,4 +62,32 @@ def test_peak_rss_is_optional_when_resource_is_unavailable(monkeypatch):
     with advisor_gc.profile_advisor_gc("Daily Advisor", logger, threshold_ms=0):
         pass
     assert logger.warning.call_count == 2
+    assert "GC trigger context" in logger.warning.call_args.args[0]
+
+
+def test_gen2_trigger_context_is_bounded_and_does_not_keep_frames(monkeypatch):
+    from custom_components.nl_day_ahead_prices import advisor_gc
+
+    logger = Mock()
+    callbacks_before = tuple(gc.callbacks)
+    with advisor_gc.profile_advisor_gc("Daily Advisor", logger, threshold_ms=0):
+        callback = gc.callbacks[-1]
+        for _ in range(5):
+            callback("start", {"generation": 2})
+            callback("stop", {"generation": 2, "collected": 0})
+    assert tuple(gc.callbacks) == callbacks_before
+    assert logger.warning.call_count == 3
+    trigger_log = logger.warning.call_args
+    assert "GC trigger context" in trigger_log.args[0]
+    assert len(trigger_log.args[2]) == 3
+    assert all(len(site) == 3 for site in trigger_log.args[2])
+
+
+def test_allocated_blocks_can_be_unavailable(monkeypatch):
+    from custom_components.nl_day_ahead_prices import advisor_gc
+
+    monkeypatch.setattr(advisor_gc, "_allocated_blocks", lambda: None)
+    logger = Mock()
+    with advisor_gc.profile_advisor_gc("Daily Advisor", logger, threshold_ms=0):
+        pass
     assert logger.warning.call_args.args[-2:] == (None, None)
