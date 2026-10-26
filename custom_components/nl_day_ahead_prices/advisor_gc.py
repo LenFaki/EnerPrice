@@ -31,6 +31,12 @@ def _peak_rss_mib():
     return None
 
 
+def _allocated_blocks():
+    """Best-effort process-wide *net* allocated blocks; not allocation churn."""
+    getter = getattr(sys, "getallocatedblocks", None)
+    return getter() if getter is not None else None
+
+
 def _gc_snapshot():
     """Read bounded GC counters without walking the tracked-object graph."""
     stats = gc.get_stats()
@@ -50,6 +56,8 @@ def profile_advisor_gc(label: str, logger: logging.Logger, threshold_ms: float =
     count_before, collections_before, collected_before = _gc_snapshot()
     thresholds = gc.get_threshold()
     peak_before = _peak_rss_mib()
+    blocks_before = _allocated_blocks()
+    gen2_start_sites = []
     active = {}
     wall_ms = [0.0, 0.0, 0.0]
     cpu_ms = [0.0, 0.0, 0.0]
@@ -64,6 +72,20 @@ def profile_advisor_gc(label: str, logger: logging.Logger, threshold_ms: float =
         if generation not in (0, 1, 2):
             return
         if phase == "start":
+            if generation == 2 and len(gen2_start_sites) < 3:
+                # Only inspect one caller frame at the start of a rare gen2 GC.
+                # Never retain the frame or inspect its locals: either would
+                # retain Home Assistant objects and skew memory diagnostics.
+                try:
+                    frame = sys._getframe(1)
+                    gen2_start_sites.append(
+                        (frame.f_code.co_filename.replace(chr(92), "/").rsplit("/", 1)[-1],
+                         frame.f_code.co_name, frame.f_lineno)
+                    )
+                except (AttributeError, ValueError):
+                    gen2_start_sites.append(("unknown", "unknown", 0))
+                finally:
+                    frame = None
             active[generation] = (perf_counter(), thread_time())
         elif phase == "stop":
             times = active.pop(generation, None)
@@ -84,6 +106,7 @@ def profile_advisor_gc(label: str, logger: logging.Logger, threshold_ms: float =
         if elapsed >= threshold_ms:
             count_after, collections_after, collected_after = _gc_snapshot()
             peak_after = _peak_rss_mib()
+            blocks_after = _allocated_blocks()
             logger.warning(
                 "EnerPrice %s GC profile: elapsed %.1f ms; thread CPU %.1f ms; "
                 "GC wall ms by generation: %s; GC CPU ms by generation: %s; "
@@ -110,4 +133,13 @@ def profile_advisor_gc(label: str, logger: logging.Logger, threshold_ms: float =
                 tuple(a - b for a, b in zip(collected_after, collected_before, strict=True)),
                 peak_before,
                 peak_after,
+            )
+            logger.warning(
+                "EnerPrice %s GC trigger context: gen2 start sites %s; "
+                "process-wide allocated blocks before/after %s -> %s "
+                "(net snapshots, not total allocations or EnerPrice ownership).",
+                label,
+                tuple(gen2_start_sites),
+                blocks_before,
+                blocks_after,
             )
