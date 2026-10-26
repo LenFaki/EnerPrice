@@ -106,8 +106,8 @@ def profile_advisor_gc(label: str, logger: logging.Logger, threshold_ms: float =
                 count_before,
                 count_after,
                 thresholds,
-                tuple(a - b for a, b in zip(collections_after, collections_before)),
-                tuple(a - b for a, b in zip(collected_after, collected_before)),
+                tuple(a - b for a, b in zip(collections_after, collections_before, strict=True)),
+                tuple(a - b for a, b in zip(collected_after, collected_before, strict=True)),
                 peak_before,
                 peak_after,
             )
