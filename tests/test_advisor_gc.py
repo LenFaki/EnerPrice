@@ -20,6 +20,10 @@ def test_gc_profile_records_collected_objects_and_unregisters(caplog):
     assert tuple(gc.callbacks) == callbacks_before
     assert "collected objects: (0, 0, 42)" in caplog.text
     assert "uncollectable objects: (0, 0, 1)" in caplog.text
+    assert "EnerPrice Daily Advisor GC pressure:" in caplog.text
+    assert "counters before/after" in caplog.text
+    assert "cumulative collections delta" in caplog.text
+    assert "peak RSS MiB before/after" in caplog.text
 
 
 def test_gc_profile_always_unregisters_after_exception():
@@ -35,3 +39,25 @@ def test_gc_profile_does_not_warn_on_fast_calculation():
     with profile_advisor_gc("Daily Advisor", logger, threshold_ms=999999):
         pass
     logger.warning.assert_not_called()
+
+
+def test_gc_pressure_uses_bounded_counters_without_scanning_objects(monkeypatch):
+    from custom_components.nl_day_ahead_prices import advisor_gc
+
+    monkeypatch.setattr(gc, "get_objects", Mock(side_effect=AssertionError("full GC scan")))
+    logger = Mock()
+    with advisor_gc.profile_advisor_gc("Smart Energy Advisor", logger, threshold_ms=0):
+        pass
+    assert logger.warning.call_count == 2
+    assert "GC pressure" in logger.warning.call_args.args[0]
+
+
+def test_peak_rss_is_optional_when_resource_is_unavailable(monkeypatch):
+    from custom_components.nl_day_ahead_prices import advisor_gc
+
+    monkeypatch.setattr(advisor_gc, "_peak_rss_mib", lambda: None)
+    logger = Mock()
+    with advisor_gc.profile_advisor_gc("Daily Advisor", logger, threshold_ms=0):
+        pass
+    assert logger.warning.call_count == 2
+    assert logger.warning.call_args.args[-2:] == (None, None)
