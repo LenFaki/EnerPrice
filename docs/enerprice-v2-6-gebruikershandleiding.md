@@ -63,23 +63,31 @@ Voor de optionele energieprestatiecontrole zijn **cumulatieve**, niet dagelijks 
 
 ## Dashboardvoorbeelden
 
-Onderstaande schermafbeeldingen komen uit een bestaande Home Assistant-installatie. Entiteitsnamen, leveranciersprijzen, apparaatinstellingen en meetwaarden verschillen per gebruiker. Dit is een zelf ingericht Home Assistant Sections-dashboard; EnerPrice installeert dit dashboard niet automatisch.
+Deze zes schermafbeeldingen tonen tabbladen van een bestaande Home Assistant-installatie, vastgelegd op 26 oktober 2026. Entiteitsnamen, leveranciersprijzen, instellingen en meetwaarden verschillen per gebruiker. Het gaat om een zelf ingericht Sections-dashboard; EnerPrice installeert dit niet automatisch.
 
-### Compleet dashboard
+### Overzicht: stroomprijzen en advies
 
-![EnerPrice dashboard met stroomprijzen, Smart Energy, prijsgrafiek en Dagelijkse Energieadviseur](images/dashboard-compleet.jpg)
+![EnerPrice-overzicht met actuele stroomprijzen, prijsgrafiek, beste gebruiksvenster, terugleveradvies en Smart Energy Advisor](images/dashboard-overzicht.jpg)
 
-### Prijsadvies en Smart Energy
+### Dagelijkse energieadviseur
 
-![EnerPrice prijsadvies en Smart Energy-advies](images/dashboard-prijsadvies-smart-energy.jpg)
+![Dagelijkse energieadviseur met beste gebruiksvenster, geschatte kosten, prijs- en zonneprognose en driedaagse vooruitblik](images/dashboard-dagadvies.jpg)
 
-### Prijsgrafiek en Dagelijkse Energieadviseur
+### Zonbewust plannen
 
-![EnerPrice prijsgrafiek en beste gebruiksmoment](images/dashboard-prijsgrafiek-dagelijks-advies.jpg)
+![Zonneprognose, gemeten overschot, datakwaliteit en vergelijking van elektrisch verwarmen met gas](images/dashboard-zonbewust-plannen.jpg)
 
-### Zonbewust advies
+### Teruglevering en energiekansen
 
-![EnerPrice zonbewust advies en uitleg bij de energiecontrole](images/dashboard-zonbewust-advies.jpg)
+![Terugleverprijs, inkoop- en terugleverprijsgrafiek, beste teruglevermoment, energiekans en leverancier](images/dashboard-teruglevering.jpg)
+
+### Instellingen en prijsmodel
+
+![EnerPrice-instellingen voor beste prijsperiode, prijstrends, opties en leverancierstarieven](images/dashboard-instellingen.jpg)
+
+### Databronnen en diagnostiek
+
+![EnerPrice-databeschikbaarheid, laatste succesvolle update, dagelijkse energiecontrole en tariefstatus](images/dashboard-diagnostiek.jpg)
 
 Het netstroomadvies en het voorwaardelijke zonnescenario zijn afzonderlijk. Verwachte voordelen zijn geen bewezen besparingen. De screenshots zijn voorbeelden, geen standaard-entiteitsnamen of gegarandeerde uitkomsten.
 
