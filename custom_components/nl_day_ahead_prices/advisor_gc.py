@@ -79,7 +79,7 @@ def profile_advisor_gc(label: str, logger: logging.Logger, threshold_ms: float =
                 try:
                     frame = sys._getframe(1)
                     gen2_start_sites.append(
-                        (frame.f_code.co_filename.replace("\\\\", "/").rsplit("/", 1)[-1],
+                        (frame.f_code.co_filename.replace(chr(92), "/").rsplit("/", 1)[-1],
                          frame.f_code.co_name, frame.f_lineno)
                     )
                 except (AttributeError, ValueError):
