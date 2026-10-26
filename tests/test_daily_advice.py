@@ -561,6 +561,28 @@ def test_daily_advisor_context_profiles_snapshot_and_export(advice_runtime, monk
         assert args[3] == pytest.approx(export_seconds * 1000)
 
 
+def test_daily_context_profiles_export_conversion(advice_runtime, monkeypatch):
+    """Export conversion must be inside the GC profiling scope."""
+    from contextlib import contextmanager
+
+    module = advice_runtime.adapter.module
+    coordinator = advice_runtime.coordinator
+    entered = []
+
+    @contextmanager
+    def fake_profile(label, logger):
+        entered.append(label)
+        try:
+            yield
+        finally:
+            entered.append("done")
+
+    monkeypatch.setattr(module, "profile_advisor_gc", fake_profile)
+    result = module.advisor_context(coordinator)
+    assert result["export_prices"]
+    assert entered == ["Daily Advisor export prices", "done"]
+
+
 def test_daily_solar_interpolation_reuses_forecast_boundaries(monkeypatch):
     """Repeated chart/solar timestamps should only interpolate once per advice."""
     import custom_components.nl_day_ahead_prices.smart_energy as smart_energy

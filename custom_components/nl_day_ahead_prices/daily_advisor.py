@@ -59,7 +59,19 @@ def advisor_context(coordinator):
     started = perf_counter()
     forecast = daily.snapshot()
     snapshot_ms = (perf_counter() - started) * 1000
-    exports = export_entries_for_supplier(data.result.prices, _selected_supplier_profile(coordinator.entry), _vat(coordinator.entry)) if data else []
+    # The export conversion can stall independently of advice generation.
+    # Profile it separately to distinguish process-wide GC pauses from work
+    # performed by the supplier tariff calculation.
+    with profile_advisor_gc("Daily Advisor export prices", _LOGGER):
+        exports = (
+            export_entries_for_supplier(
+                data.result.prices,
+                _selected_supplier_profile(coordinator.entry),
+                _vat(coordinator.entry),
+            )
+            if data
+            else []
+        )
     export_ms = (perf_counter() - started) * 1000 - snapshot_ms
     if snapshot_ms + export_ms >= 250:
         _LOGGER.warning(
