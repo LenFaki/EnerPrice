@@ -18,6 +18,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from .advisor import build_price_advice
+from .advisor_gc import profile_advisor_gc
 from .analysis.forecast import average_next_period
 from .analysis.periods import active_and_next, find_price_periods
 from .analysis.rating import price_ratings
@@ -829,21 +830,22 @@ class NLSmartEnergyAdvisorSensor(CoordinatorEntity[NLDayAheadPricesCoordinator],
             from .daily_advisor import advisor_context
 
             context = advisor_context(self.coordinator)
-        return build_smart_energy_advice(
-            electricity_price=current_price(all_in, now),
-            future_prices=all_in,
-            now=now,
-            gas_price_per_m3=_state_float_sensor(self.hass, options.get(CONF_GAS_PRICE_ENTITY)),
-            solar_power_w=_state_float_sensor(self.hass, options.get(CONF_SOLAR_POWER_ENTITY)),
-            grid_power_w=_state_float_sensor(self.hass, options.get(CONF_GRID_POWER_ENTITY)),
-            flexible_load_power_w=options.get(CONF_FLEXIBLE_LOAD_POWER_W),
-            electric_efficiency=float(options.get(CONF_ELECTRIC_EFFICIENCY, DEFAULT_ELECTRIC_EFFICIENCY)),
-            gas_efficiency=float(options.get(CONF_GAS_EFFICIENCY, DEFAULT_GAS_EFFICIENCY)),
-            gas_kwh_per_m3=float(options.get(CONF_GAS_KWH_PER_M3, DEFAULT_GAS_KWH_PER_M3)),
-            solar_surplus_threshold_w=float(options.get(CONF_SOLAR_SURPLUS_THRESHOLD_W, DEFAULT_SOLAR_SURPLUS_THRESHOLD_W)),
-            language=language,
-            daily_context=context,
-        )
+        with profile_advisor_gc("Smart Energy Advisor", _LOGGER):
+            return build_smart_energy_advice(
+                electricity_price=current_price(all_in, now),
+                future_prices=all_in,
+                now=now,
+                gas_price_per_m3=_state_float_sensor(self.hass, options.get(CONF_GAS_PRICE_ENTITY)),
+                solar_power_w=_state_float_sensor(self.hass, options.get(CONF_SOLAR_POWER_ENTITY)),
+                grid_power_w=_state_float_sensor(self.hass, options.get(CONF_GRID_POWER_ENTITY)),
+                flexible_load_power_w=options.get(CONF_FLEXIBLE_LOAD_POWER_W),
+                electric_efficiency=float(options.get(CONF_ELECTRIC_EFFICIENCY, DEFAULT_ELECTRIC_EFFICIENCY)),
+                gas_efficiency=float(options.get(CONF_GAS_EFFICIENCY, DEFAULT_GAS_EFFICIENCY)),
+                gas_kwh_per_m3=float(options.get(CONF_GAS_KWH_PER_M3, DEFAULT_GAS_KWH_PER_M3)),
+                solar_surplus_threshold_w=float(options.get(CONF_SOLAR_SURPLUS_THRESHOLD_W, DEFAULT_SOLAR_SURPLUS_THRESHOLD_W)),
+                language=language,
+                daily_context=context,
+            )
 
     @property
     def native_value(self) -> str:
