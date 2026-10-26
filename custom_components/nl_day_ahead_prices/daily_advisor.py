@@ -14,6 +14,7 @@ from homeassistant.helpers.event import async_track_state_change_event, async_tr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
+from .advisor_gc import profile_advisor_gc
 from .const import (
     CONF_ADVICE_LANGUAGE,
     CONF_DAILY_CONSUMPTION_ENTITIES,
@@ -96,11 +97,12 @@ def daily_advice(coordinator, language=None):
         conversion_ms = (perf_counter() - started) * 1000
         context = advisor_context(coordinator)
         context_ms = (perf_counter() - started) * 1000 - conversion_ms
-        result = build_smart_energy_advice(
-            electricity_price=None, future_prices=utc_prices, now=now,
-            flexible_load_power_w=options.get(CONF_FLEXIBLE_LOAD_POWER_W), language=language,
-            daily_context=context,
-        )["daily_advisor"]
+        with profile_advisor_gc("Daily Advisor", _LOGGER):
+            result = build_smart_energy_advice(
+                electricity_price=None, future_prices=utc_prices, now=now,
+                flexible_load_power_w=options.get(CONF_FLEXIBLE_LOAD_POWER_W), language=language,
+                daily_context=context,
+            )["daily_advisor"]
         calculation_ms = (perf_counter() - started) * 1000 - conversion_ms - context_ms
         total_ms = (perf_counter() - started) * 1000
         if total_ms >= 250:
