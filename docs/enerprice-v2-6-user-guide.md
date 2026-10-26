@@ -66,25 +66,33 @@ Optional energy performance tracking requires **cumulative** import and export e
 
 ## Dashboard examples
 
-These are example screenshots from a real Home Assistant installation. Sensor names, supplier tariffs, appliance settings and values will differ on your system. The screens use a custom Home Assistant Sections dashboard; EnerPrice does not automatically install this dashboard.
+These screenshots show six tabs of a real Home Assistant Sections dashboard, captured on 26 October 2026. Sensor names, tariffs, settings, and values vary by installation. EnerPrice does not automatically install this custom dashboard.
 
-### Full dashboard
+### Overview: electricity prices and advice
 
-![EnerPrice dashboard with prices, Smart Energy, chart and Daily Energy Advisor](images/dashboard-compleet.jpg)
+![EnerPrice overview with current electricity prices, day-ahead chart, best usage window, export advice and Smart Energy Advisor](images/dashboard-overzicht.jpg)
 
-### Price advice and Smart Energy
+### Daily Energy Advisor
 
-![EnerPrice price advice and Smart Energy Advisor](images/dashboard-prijsadvies-smart-energy.jpg)
+![Daily Energy Advisor with best usage window, estimated cost, price and solar forecast, and three-day outlook](images/dashboard-dagadvies.jpg)
 
-### Price chart and Daily Energy Advisor
+### Solar-aware planning
 
-![EnerPrice day-ahead price chart and daily consumption advice](images/dashboard-prijsgrafiek-dagelijks-advies.jpg)
+![Solar forecast, measured surplus, data quality and comparison of electric and gas heating](images/dashboard-zonbewust-plannen.jpg)
 
-### Solar-aware advice
+### Export tariff and energy opportunities
 
-![EnerPrice solar-aware advice and energy-check explanation](images/dashboard-zonbewust-advies.jpg)
+![Export price and buy/sell chart, best export window, energy opportunity and supplier](images/dashboard-teruglevering.jpg)
 
-The grid-only recommendation and conditional solar scenario are separate; forecast savings are not verified realized savings. Screenshots illustrate one configuration, not default entity IDs or guaranteed results.
+### Settings and price model
+
+![EnerPrice best-price-period settings, price trends, options and supplier tariff settings](images/dashboard-instellingen.jpg)
+
+### Data sources and diagnostics
+
+![EnerPrice data availability, last successful update, daily energy check and tariff status](images/dashboard-diagnostiek.jpg)
+
+The grid-only recommendation and conditional solar scenario are separate; forecast savings are not verified realized savings. These screenshots illustrate one configuration, not default entity IDs or guaranteed results.
 
 ## Dashboards and a simple setup path
 
