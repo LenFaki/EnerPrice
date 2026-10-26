@@ -61,7 +61,10 @@ def test_peak_rss_is_optional_when_resource_is_unavailable(monkeypatch):
     logger = Mock()
     with advisor_gc.profile_advisor_gc("Daily Advisor", logger, threshold_ms=0):
         pass
-    assert logger.warning.call_count == 2
+    assert logger.warning.call_count == 3
+    pressure_log = logger.warning.call_args_list[1]
+    assert "GC pressure" in pressure_log.args[0]
+    assert pressure_log.args[-2:] == (None, None)
     assert "GC trigger context" in logger.warning.call_args.args[0]
 
 
