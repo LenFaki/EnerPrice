@@ -52,6 +52,45 @@ def daily(prices, ctx=None, *, now=NOW, power=1000, language="en"):
                                     daily_context=ctx if ctx is not None else context(prices, now=now))["daily_advisor"]
 
 
+def test_future_advice_chooses_earliest_qualifying_interval_from_unsorted_prices():
+    """One-pass selection must preserve the old chronological choice."""
+    now = NOW.astimezone(timezone.utc)
+    entries = [
+        PriceEntry(now + timedelta(hours=4), .10),
+        PriceEntry(now - timedelta(hours=1), .01),
+        PriceEntry(now + timedelta(hours=2), .19),
+        PriceEntry(now + timedelta(hours=1), .30),
+        PriceEntry(now + timedelta(hours=3), .18),
+    ]
+    result = build_smart_energy_advice(
+        electricity_price=.25, future_prices=entries, now=now,
+    )
+    assert result["next_better_time"] == now + timedelta(hours=2)
+    assert result["next_better_price"] == .19
+    assert result["minutes_until_better"] == 120
+
+
+def test_future_advice_returns_no_window_when_no_price_qualifies():
+    now = NOW.astimezone(timezone.utc)
+    result = build_smart_energy_advice(
+        electricity_price=.25,
+        future_prices=[PriceEntry(now + timedelta(hours=1), .24)],
+        now=now,
+    )
+    assert result["next_better_time"] is None
+    assert result["minutes_until_better"] is None
+
+
+def test_daily_known_interval_count_and_partial_status_are_preserved():
+    prices = prices_for_day()
+    prices.pop(4)
+    result = daily(prices, context(prices))
+    today = result["days"][0]
+    assert today["price_status"] == "partial"
+    assert today["known_intervals"] == 23
+    assert today["expected_intervals"] == 24
+
+
 def test_legacy_advice_unchanged_without_daily_context():
     args = {"electricity_price": .22, "now": NOW, "gas_price_per_m3": 1.3, "grid_power_w": -700, "flexible_load_power_w": 1500}
     before = build_smart_energy_advice(**args)

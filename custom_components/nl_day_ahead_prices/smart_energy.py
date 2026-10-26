@@ -191,11 +191,14 @@ def _future_context(
 ) -> dict[str, Any]:
     if current_price is None or not prices or now is None:
         return _empty_future()
-    future = sorted((item for item in prices if item.time > now), key=lambda item: item.time)
-    if not future:
-        return _empty_future()
     threshold = current_price * 0.95 if current_price > 0 else current_price - 0.005
-    better = next((item for item in future if item.price <= threshold), None)
+    # Find the earliest qualifying interval in one pass. Sorting all future
+    # prices allocated a temporary list on every live sensor refresh.
+    better = min(
+        (item for item in prices if item.time > now and item.price <= threshold),
+        key=lambda item: item.time,
+        default=None,
+    )
     if better is None:
         return _empty_future()
     return {
@@ -274,10 +277,10 @@ def _daily_advice(prices, now, context, power_w, language):
         start = datetime.combine(day, time.min, AMSTERDAM).astimezone(timezone.utc)
         end = datetime.combine(day + timedelta(days=1), time.min, AMSTERDAM).astimezone(timezone.utc)
         stamps = [start + step * i for i in range(int((end - start) / step))]
-        known = [stamp for stamp in stamps if stamp in price_map]
-        price_status = "known" if len(known) == len(stamps) else "partial" if known else "unknown"
+        known_count = sum(stamp in price_map for stamp in stamps)
+        price_status = "known" if known_count == len(stamps) else "partial" if known_count else "unknown"
         future = [stamp for stamp in stamps if stamp >= now]
-        daily = {"date": day.isoformat(), "price_status": price_status, "known_intervals": len(known),
+        daily = {"date": day.isoformat(), "price_status": price_status, "known_intervals": known_count,
                  "expected_intervals": len(stamps), "solar_energy_kwh": solar_days.get(day.isoformat(), {}).get("energy_kwh"),
                  "solar_status": solar_days.get(day.isoformat(), {}).get("status", "missing"), "window": None}
         for stamp in stamps:
