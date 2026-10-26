@@ -1,6 +1,6 @@
 [project]
 name = "home-assistant-nl-day-ahead-prices"
-version = "2.6.10-beta.4"
+version = "2.6.10-beta.5"
 description = "EnerPrice smart energy assistant for Dutch dynamic electricity tariffs"
 requires-python = ">=3.12"
 
