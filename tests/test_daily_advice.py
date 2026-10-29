@@ -436,6 +436,18 @@ async def test_no_market_prices_keep_daily_outlook_available(advice_runtime):
     assert await handler(SimpleNamespace(service="get_smart_energy_advice", data={})) == {"error": "Price data is not available"}
 
 
+def test_daily_cache_miss_reasons_are_bounded_and_exclude_values(advice_runtime):
+    module = advice_runtime.adapter.module
+    reasons = module._daily_cache_miss_reasons
+    before = (1, 2, 3, "secret-option-value", "nl")
+    assert reasons(None, before) == "initial"
+    assert reasons(before, before) == "unknown"
+    assert reasons(before, (1, 4, 5, "different-secret", "en")) == (
+        "forecast,time_bucket,options,language"
+    )
+    assert "secret" not in reasons(before, (1, 4, 5, "different-secret", "en"))
+
+
 def test_shared_daily_result_cache_invalidates_on_options_and_forecast(advice_runtime):
     runtime = advice_runtime
     calculate = runtime.adapter.module.daily_advice
@@ -533,6 +545,8 @@ def test_daily_advice_profiling_warns_only_on_slow_cache_misses(advice_runtime, 
         assert warning.call_count == 1
         assert "recomputation took" in warning.call_args.args[0]
         assert warning.call_args.args[1] == pytest.approx(elapsed * 1000)
+        assert "cache miss: %s" in warning.call_args.args[0]
+        assert warning.call_args.args[-1] == "initial"
 
 
 @pytest.mark.parametrize("snapshot_seconds,export_seconds,expected_warning", [
