@@ -85,6 +85,16 @@ def advisor_context(coordinator):
             "resolution_minutes": 15 if data and data.result.effective_price_resolution == "quarter_hour" else 60}
 
 
+def _daily_cache_miss_reasons(previous, current):
+    """Describe cache invalidation without logging options or sensor values."""
+    if previous is None:
+        return "initial"
+    names = ("prices", "forecast", "time_bucket", "options", "language")
+    changed = [name for name, before, after in zip(names, previous, current, strict=True)
+               if before != after]
+    return ",".join(changed) or "unknown"
+
+
 def daily_advice(coordinator, language=None):
     """One cached result shared by the new Daily Advisor entities."""
     from .sensor import _cached_all_in_entries
@@ -98,7 +108,9 @@ def daily_advice(coordinator, language=None):
     prices = _cached_all_in_entries(coordinator, coordinator.data, coordinator.entry) if coordinator.data else []
     signature = (id(prices), id(coordinator.daily_forecast.data), advice_time_bucket(now), repr(options), language)
     cache = getattr(coordinator, "analysis_cache", {})
-    if cache.get("daily_advice", (None,))[0] != signature:
+    previous = cache.get("daily_advice")
+    if previous is None or previous[0] != signature:
+        miss_reasons = _daily_cache_miss_reasons(previous[0] if previous else None, signature)
         # Conversion is only needed on a cache miss. Home Assistant reads
         # state and attributes separately, often within the same minute.
         # Absolute timestamps avoid same-zone repeated-hour comparisons.
@@ -121,8 +133,8 @@ def daily_advice(coordinator, language=None):
             _LOGGER.warning(
                 "EnerPrice Daily Advisor recomputation took %.1f ms "
                 "(UTC prices: %.1f ms, context: %.1f ms, advice: %.1f ms; "
-                "price entries: %d). Check for repeated warnings and report timings.",
-                total_ms, conversion_ms, context_ms, calculation_ms, len(prices),
+                "price entries: %d; cache miss: %s). Check for repeated warnings and report timings.",
+                total_ms, conversion_ms, context_ms, calculation_ms, len(prices), miss_reasons,
             )
         cache["daily_advice"] = (signature, result)
     return cache["daily_advice"][1]
