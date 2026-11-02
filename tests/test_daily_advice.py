@@ -457,9 +457,54 @@ def test_shared_daily_result_cache_invalidates_on_options_and_forecast(advice_ru
     second = calculate(runtime.coordinator)
     assert second is not first
     assert second["best_window"]["duration_minutes"] == 120
+    # A routine coordinator tick creates a fresh snapshot even when its
+    # contents are identical; that must not recompute the expensive advice.
     runtime.coordinator.daily_forecast.data = dict(runtime.coordinator.daily_forecast.data)
+    assert calculate(runtime.coordinator) is second
+    # A real forecast quality change must still invalidate the cache.
+    runtime.coordinator.daily_forecast.data = {
+        **runtime.coordinator.daily_forecast.data,
+        "quality": "changed-forecast-quality",
+    }
     assert calculate(runtime.coordinator) is not second
     assert set(runtime.coordinator.analysis_cache) == {"daily_advice"}
+
+
+def test_daily_advice_cache_invalidates_on_measurements_and_series(advice_runtime):
+    from copy import deepcopy
+
+    runtime = advice_runtime
+    calculate = runtime.adapter.module.daily_advice
+    first = calculate(runtime.coordinator)
+    original = runtime.coordinator.daily_forecast.data
+    same = deepcopy(original)
+    runtime.coordinator.daily_forecast.data = same
+    assert calculate(runtime.coordinator) is first
+
+    # Measurements may affect solar/grid-aware advice. A changed reading must
+    # invalidate even when the snapshot's other fields stay the same.
+    updated = deepcopy(same)
+    updated["measurements"] = [*updated.get("measurements", []),
+                               {"role": "grid_power", "value": 123, "unit": "W"}]
+    runtime.coordinator.daily_forecast.data = updated
+    second = calculate(runtime.coordinator)
+    assert second is not first
+
+    # Forecast.Solar series changes must also invalidate the cached advice.
+    changed_series = deepcopy(updated)
+    changed_series["series"] = [*changed_series.get("series", []),
+                                {"time": "2026-10-29T12:00:00+00:00", "power_w": 300}]
+    runtime.coordinator.daily_forecast.data = changed_series
+    assert calculate(runtime.coordinator) is not second
+
+
+def test_daily_advice_cache_invalidates_on_time_bucket(advice_runtime, monkeypatch):
+    runtime = advice_runtime
+    module = runtime.adapter.module
+    monkeypatch.setattr(module, "advice_time_bucket", lambda _: 1)
+    first = module.daily_advice(runtime.coordinator)
+    monkeypatch.setattr(module, "advice_time_bucket", lambda _: 2)
+    assert module.daily_advice(runtime.coordinator) is not first
 
 
 async def test_dashboard_service_resolves_daily_ids_and_flags(advice_runtime):

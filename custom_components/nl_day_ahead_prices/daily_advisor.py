@@ -106,7 +106,12 @@ def daily_advice(coordinator, language=None):
         language = coordinator.hass.config.language
     now = dt_util.utcnow()
     prices = _cached_all_in_entries(coordinator, coordinator.data, coordinator.entry) if coordinator.data else []
-    signature = (id(prices), id(coordinator.daily_forecast.data), advice_time_bucket(now), repr(options), language)
+    # Compare forecast snapshots by value, not object identity: the forecast
+    # coordinator creates a fresh dict for routine state-change and clock
+    # notifications, even when the actual forecast/measurements are unchanged.
+    # Keep the complete snapshot in the signature so real changes (including
+    # measurements, freshness and series) still invalidate the advice.
+    signature = (id(prices), coordinator.daily_forecast.data, advice_time_bucket(now), repr(options), language)
     cache = getattr(coordinator, "analysis_cache", {})
     previous = cache.get("daily_advice")
     if previous is None or previous[0] != signature:
