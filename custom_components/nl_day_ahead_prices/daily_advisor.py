@@ -95,6 +95,52 @@ def _daily_cache_miss_reasons(previous, current):
     return ",".join(changed) or "unknown"
 
 
+def _forecast_change_reasons(before, after):
+    """Safe, bounded field-level reasons; never expose values or entity IDs."""
+    if not isinstance(before, dict) or not isinstance(after, dict):
+        return "snapshot"
+    labels = []
+    for key, label in (
+        ("days", "days"),
+        ("series", "series"),
+        ("series_status", "series_status"),
+        ("quality", "quality"),
+        ("issues", "issues"),
+    ):
+        if before.get(key) != after.get(key):
+            labels.append(label)
+
+    # Separate measured values from bookkeeping timestamps and availability.
+    # This helps distinguish real sensor changes from refresh-only churn.
+    old_measurements = before.get("measurements", [])
+    new_measurements = after.get("measurements", [])
+    if old_measurements != new_measurements:
+        if not isinstance(old_measurements, list) or not isinstance(new_measurements, list):
+            labels.append("measurements")
+        elif len(old_measurements) != len(new_measurements):
+            labels.append("measurements_structure")
+        elif any(not isinstance(item, dict) for item in old_measurements + new_measurements):
+            labels.append("measurements")
+        else:
+            fields = (
+                ("measurements_value", ("value",)),
+                ("measurements_time", ("last_updated", "observed_at")),
+                ("measurements_status", ("kind", "status")),
+                ("measurements_metadata", ("entity_id", "role", "unit", "state_class")),
+            )
+            for label, keys in fields:
+                if any(tuple(old.get(key) for key in keys) != tuple(new.get(key) for key in keys)
+                       for old, new in zip(old_measurements, new_measurements, strict=True)):
+                    labels.append(label)
+            if not any(label.startswith("measurements_") for label in labels):
+                labels.append("measurements_other")
+
+    known = {"days", "series", "series_status", "quality", "issues", "measurements"}
+    if any(before.get(key) != after.get(key) for key in (before.keys() | after.keys()) - known):
+        labels.append("other")
+    return ",".join(labels) or "unknown"
+
+
 def daily_advice(coordinator, language=None):
     """One cached result shared by the new Daily Advisor entities."""
     from .sensor import _cached_all_in_entries
@@ -116,6 +162,11 @@ def daily_advice(coordinator, language=None):
     previous = cache.get("daily_advice")
     if previous is None or previous[0] != signature:
         miss_reasons = _daily_cache_miss_reasons(previous[0] if previous else None, signature)
+        # Only enrich the existing slow-recomputation warning. The snapshot
+        # details are fixed category labels, never measurements or entity IDs.
+        if previous and previous[0][1] != signature[1]:
+            forecast_reasons = _forecast_change_reasons(previous[0][1], signature[1])
+            miss_reasons += f"; forecast detail: {forecast_reasons}"
         # Conversion is only needed on a cache miss. Home Assistant reads
         # state and attributes separately, often within the same minute.
         # Absolute timestamps avoid same-zone repeated-hour comparisons.
