@@ -448,6 +448,65 @@ def test_daily_cache_miss_reasons_are_bounded_and_exclude_values(advice_runtime)
     assert "secret" not in reasons(before, (1, 4, 5, "different-secret", "en"))
 
 
+def test_forecast_change_reasons_are_bounded_and_hide_values(advice_runtime):
+    reasons = advice_runtime.adapter.module._forecast_change_reasons
+    before = {
+        "days": [{"date": "2026-11-03", "energy_kwh": 4}],
+        "series": [{"points": [1]}],
+        "quality": "available",
+        "issues": [],
+        "measurements": [{"entity_id": "sensor.private_name", "role": "grid_power",
+                          "value": 12, "last_updated": "private-timestamp",
+                          "observed_at": "private-observation", "status": "available"}],
+    }
+    after = {
+        **before,
+        "days": [{"date": "2026-11-03", "energy_kwh": 5}],
+        "measurements": [{**before["measurements"][0], "value": 13,
+                          "last_updated": "another-private-timestamp",
+                          "status": "unavailable"}],
+    }
+    assert reasons(before, before) == "unknown"
+    assert reasons(before, after) == (
+        "days,measurements_value,measurements_time,measurements_status"
+    )
+    assert "private" not in reasons(before, after)
+    assert reasons(before, {**before, "measurements": [*before["measurements"], {}]}) == (
+        "measurements_structure"
+    )
+    assert reasons(before, {**before, "series": [{"points": [2]}]}) == "series"
+    assert reasons(before, {**before, "extra": "secret"}) == "other"
+    assert reasons(None, after) == "snapshot"
+
+
+def test_forecast_change_reasons_detect_timestamp_only_updates(advice_runtime):
+    reasons = advice_runtime.adapter.module._forecast_change_reasons
+    before = {"measurements": [{"role": "solar_power", "value": 10,
+                                "last_updated": "2026-11-03T08:00:00Z"}]}
+    after = {"measurements": [{"role": "solar_power", "value": 10,
+                               "last_updated": "2026-11-03T08:01:00Z"}]}
+    assert reasons(before, after) == "measurements_time"
+
+
+def test_slow_forecast_cache_miss_reports_safe_details(advice_runtime, monkeypatch):
+    module = advice_runtime.adapter.module
+    coordinator = advice_runtime.coordinator
+    first = module.daily_advice(coordinator)
+    coordinator.daily_forecast.data = {
+        **coordinator.daily_forecast.data,
+        "quality": "private-forecast-value",
+    }
+    ticks = iter([0.0, .001, .002, .3, .31])
+    monkeypatch.setattr(module, "perf_counter", lambda: next(ticks))
+    monkeypatch.setattr(module, "advisor_context", lambda *_: {})
+    warning = Mock()
+    monkeypatch.setattr(module._LOGGER, "warning", warning)
+    assert module.daily_advice(coordinator) is not first
+    assert warning.call_count == 1
+    assert warning.call_args.args[-1] == "forecast; forecast detail: quality"
+    assert "private" not in str(warning.call_args)
+
+
 def test_shared_daily_result_cache_invalidates_on_options_and_forecast(advice_runtime):
     runtime = advice_runtime
     calculate = runtime.adapter.module.daily_advice
