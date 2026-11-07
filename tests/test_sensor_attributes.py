@@ -372,6 +372,25 @@ def test_average_all_in_sensor_keeps_statistics_unit(sensor_module):
     assert sensor.entity_description.native_unit_of_measurement == "EUR/kWh"
 
 
+def test_numeric_sensor_states_declare_numeric_metadata(sensor_module):
+    """Home Assistant only graphs and records statistics for sensors with a unit or state class."""
+    sensor = make_sensor(sensor_module, [
+        PriceEntry(item.time, 0.05 + index * 0.002) for index, item in enumerate(day_prices("2026-09-08", 15))
+    ])
+    sensor.coordinator.hass = SimpleNamespace(config=SimpleNamespace(language="en"))
+    sensor.coordinator.cached_analysis = lambda key, factory: factory()
+    numeric = {}
+    for description in sensor_module.SENSORS:
+        sensor.entity_description = description
+        value = sensor.native_value
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            numeric[description.key] = description
+    assert "price_score" in numeric
+    untyped = [key for key, item in numeric.items() if item.native_unit_of_measurement is None and item.state_class is None]
+    assert untyped == []
+    assert numeric["price_score"].state_class == "measurement"
+
+
 def test_large_chart_attributes_are_unrecorded_but_remain_public(sensor_module):
     sensor = make_sensor(sensor_module, day_prices("2026-09-08", 15))
     sensor.coordinator.data.result.prices_tomorrow = day_prices("2026-09-09", 15)

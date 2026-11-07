@@ -722,7 +722,15 @@ SENSORS: tuple[NLPriceSensorDescription, ...] = (
     _advanced_sensor("peak_price_period_progress_percent", analysis_key="peak:progress", unit="%"),
     _advanced_sensor("next_peak_price_period_start", analysis_key="peak:next_start", timestamp=True),
     _v2_sensor("price_advisor", enabled=True, options=["excellent", "good", "neutral", "avoid", "critical"]),
-    _v2_sensor("price_score", enabled=True),
+    NLPriceSensorDescription(
+        key="price_score",
+        translation_key="price_score",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        entity_registry_enabled_default=True,
+        value_fn=lambda data, now, entry: None,
+        analysis_key="v2:price_score",
+    ),
     _v2_sensor("today_score", options=["excellent", "good", "normal", "expensive", "volatile"]),
     _v2_sensor("tomorrow_score", options=["excellent", "good", "normal", "expensive", "volatile"]),
     _v2_sensor(
