@@ -503,7 +503,10 @@ def test_daily_advisor_context_profiles_snapshot_and_export(advice_runtime, monk
     """Only slow contexts log, and each stage is timed separately."""
     module = advice_runtime.adapter.module
     coordinator = advice_runtime.coordinator
-    ticks = iter([0.0, snapshot_seconds, snapshot_seconds + export_seconds])
+    # Snapshot end, profile start/end, export start/end.
+    ticks = iter([0.0, snapshot_seconds, snapshot_seconds,
+                  snapshot_seconds, snapshot_seconds,
+                  snapshot_seconds + export_seconds])
     monkeypatch.setattr(module, "perf_counter", lambda: next(ticks))
     warning = Mock()
     monkeypatch.setattr(module._LOGGER, "warning", warning)
@@ -518,7 +521,8 @@ def test_daily_advisor_context_profiles_snapshot_and_export(advice_runtime, monk
         assert "context took" in args[0]
         assert args[1] == pytest.approx((snapshot_seconds + export_seconds) * 1000)
         assert args[2] == pytest.approx(snapshot_seconds * 1000)
-        assert args[3] == pytest.approx(export_seconds * 1000)
+        assert args[3] == pytest.approx(0.0)  # supplier-profile lookup
+        assert args[4] == pytest.approx(export_seconds * 1000)
 
 
 def test_daily_solar_interpolation_reuses_forecast_boundaries(monkeypatch):

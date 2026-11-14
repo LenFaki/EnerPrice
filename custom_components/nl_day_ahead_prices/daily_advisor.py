@@ -57,13 +57,18 @@ def advisor_context(coordinator):
     started = perf_counter()
     forecast = daily.snapshot()
     snapshot_ms = (perf_counter() - started) * 1000
-    exports = export_entries_for_supplier(data.result.prices, _selected_supplier_profile(coordinator.entry), _vat(coordinator.entry)) if data else []
-    export_ms = (perf_counter() - started) * 1000 - snapshot_ms
-    if snapshot_ms + export_ms >= 250:
+    profile_started = perf_counter()
+    supplier_profile = _selected_supplier_profile(coordinator.entry) if data else None
+    vat = _vat(coordinator.entry) if data else None
+    profile_ms = (perf_counter() - profile_started) * 1000
+    exports_started = perf_counter()
+    exports = export_entries_for_supplier(data.result.prices, supplier_profile, vat) if data else []
+    export_ms = (perf_counter() - exports_started) * 1000
+    if snapshot_ms + profile_ms + export_ms >= 250:
         _LOGGER.warning(
             "EnerPrice Daily Advisor context took %.1f ms "
-            "(forecast snapshot: %.1f ms, export prices: %.1f ms; price entries: %d).",
-            snapshot_ms + export_ms, snapshot_ms, export_ms,
+            "(forecast snapshot: %.1f ms, supplier profile: %.1f ms, export prices: %.1f ms; price entries: %d).",
+            snapshot_ms + profile_ms + export_ms, snapshot_ms, profile_ms, export_ms,
             len(data.result.prices) if data else 0,
         )
     return {"forecast": forecast, "export_prices": exports,

@@ -221,3 +221,16 @@ def test_interval_tariffs_use_local_date_and_per_call_cache(monkeypatch):
     values = calculations.build_all_in_price_attributes_for_supplier(prices, 0.1108, custom, 0.21)
     lookup.assert_not_called()
     assert [item["price"] for item in values] == pytest.approx([0.2718] * 4)
+
+
+def test_single_supplier_lookup_matches_full_registry_across_dates_and_modes():
+    """Fast-path lookup must preserve the established registry selection contract."""
+    profiles = load_supplier_profiles()
+    dates = (date(2025, 12, 31), TODAY, date(2027, 1, 1))
+    modes = (registry.SUPPLIER_UPDATES_AUTOMATIC, registry.SUPPLIER_UPDATES_BUNDLED)
+    for day in dates:
+        for mode in modes:
+            full = registry.get_supplier_profiles(day, mode=mode)
+            for supplier_id in profiles:
+                assert registry.get_supplier_tariff(supplier_id, day, mode=mode) == full[supplier_id]
+            assert registry.get_supplier_tariff("does_not_exist", day, mode=mode) is None

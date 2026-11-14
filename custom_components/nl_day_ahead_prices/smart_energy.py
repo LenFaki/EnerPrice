@@ -2,15 +2,21 @@
 
 from __future__ import annotations
 
+import gc
+import logging
 from bisect import bisect_right
 from datetime import datetime, time, timedelta, timezone
 from functools import cache
 from math import ceil, isfinite
+from threading import get_ident
+from time import perf_counter, thread_time
 from typing import Any
 
 from .models import PriceEntry
 from .optimizer import optimize_intervals
 from .solar_forecast import AMSTERDAM
+
+_LOGGER = logging.getLogger(__name__)
 
 DEFAULT_GAS_KWH_PER_M3 = 9.769
 
@@ -220,11 +226,63 @@ def _round(value: float | None) -> float | None:
 
 
 def _daily_advice(prices, now, context, power_w, language):
+    """Profile GC pauses on the calling thread during Daily Advisor planning."""
+    owner_thread = get_ident()
+    started = perf_counter()
+    gc_started = {}
+    gc_wall_ms = [0.0, 0.0, 0.0]
+    gc_cpu_ms = [0.0, 0.0, 0.0]
+    gc_events = [0, 0, 0]
+
+    def gc_callback(phase, info):
+        # GC callbacks are process-wide; only measure this invocation's thread.
+        if get_ident() != owner_thread:
+            return
+        generation = info.get("generation")
+        if generation not in (0, 1, 2):
+            return
+        if phase == "start":
+            gc_started[generation] = (perf_counter(), thread_time())
+        elif phase == "stop":
+            times = gc_started.pop(generation, None)
+            if times is not None:
+                gc_wall_ms[generation] += (perf_counter() - times[0]) * 1000
+                gc_cpu_ms[generation] += (thread_time() - times[1]) * 1000
+                gc_events[generation] += 1
+
+    gc.callbacks.append(gc_callback)
+    try:
+        return _daily_advice_impl(prices, now, context, power_w, language)
+    finally:
+        gc.callbacks.remove(gc_callback)
+        elapsed_ms = (perf_counter() - started) * 1000
+        if elapsed_ms >= 250:
+            _LOGGER.warning(
+                "EnerPrice Daily Advisor GC profile: elapsed %.1f ms; "
+                "GC wall ms by generation: %s; GC thread CPU ms by generation: %s; "
+                "GC events by generation: %s.",
+                elapsed_ms,
+                tuple(round(value, 1) for value in gc_wall_ms),
+                tuple(round(value, 1) for value in gc_cpu_ms),
+                tuple(gc_events),
+            )
+
+
+def _daily_advice_impl(prices, now, context, power_w, language):
     """Add calendar-day planning to the existing advisor, using its shared optimizer.
 
     Grid-only windows and conditional solar alternatives remain separate models.
     A point-in-time measurement never becomes a claim of future measured surplus.
     """
+    started = perf_counter()
+    cpu_started = thread_time()
+    gc_before = tuple(generation["collections"] for generation in gc.get_stats())
+    chart_ms = grid_ms = solar_ms = 0.0
+    chart_cpu_ms = 0.0
+    chart_day_ms = []
+    chart_day_gc = []
+    chart_calls = 0
+    chart_interpolation_ms = 0.0
     nl = language.lower().startswith("nl")
     now = now.astimezone(timezone.utc)
     forecast = context.get("forecast", {})
@@ -238,7 +296,10 @@ def _daily_advice(prices, now, context, power_w, language):
     price_map = {item.time.astimezone(timezone.utc): item.price for item in prices if isfinite(item.price)}
     export_map = {item.time.astimezone(timezone.utc): item.price for item in context.get("export_prices", []) if isfinite(item.price)}
     solar_days = {day["date"]: day for day in forecast.get("days", [])}
+    forecast_started = perf_counter()
     series = _power_series(forecast)
+    forecast_ms = (perf_counter() - forecast_started) * 1000
+    forecast_points = sum(len(points) for points in series)
     # Forecast knots and interval boundaries recur across chart and solar integration.
     # Keep the memoization scoped to this calculation: no stale forecast values.
     power_at = cache(lambda stamp: _power_at(series, stamp))
@@ -280,14 +341,26 @@ def _daily_advice(prices, now, context, power_w, language):
         daily = {"date": day.isoformat(), "price_status": price_status, "known_intervals": len(known),
                  "expected_intervals": len(stamps), "solar_energy_kwh": solar_days.get(day.isoformat(), {}).get("energy_kwh"),
                  "solar_status": solar_days.get(day.isoformat(), {}).get("status", "missing"), "window": None}
+        chart_started = perf_counter()
+        chart_cpu_started = thread_time()
+        chart_gc_before = tuple(generation["collections"] for generation in gc.get_stats())
         for stamp in stamps:
+            interpolation_started = perf_counter()
             solar_w = power_at(stamp.timestamp())
+            chart_interpolation_ms += (perf_counter() - interpolation_started) * 1000
+            chart_calls += 1
             chart.append({"time": stamp.isoformat(), "price": price_map.get(stamp), "solar_kw": solar_w / 1000 if solar_w is not None else None})
+        chart_day_ms.append(round((perf_counter() - chart_started) * 1000, 1))
+        chart_ms += chart_day_ms[-1]
+        chart_cpu_ms += (thread_time() - chart_cpu_started) * 1000
+        chart_day_gc.append(tuple(generation["collections"] - before for generation, before in zip(gc.get_stats(), chart_gc_before, strict=True)))
         # Never optimize across a missing price interval or extend the last known price.
         complete = future and all(stamp in price_map for stamp in future)
         if complete:
             entries = [PriceEntry(stamp, price_map[stamp]) for stamp in future]
+            grid_started = perf_counter()
             plan = optimize_intervals(entries, duration, alternatives=0, resolution_minutes=minutes)
+            grid_ms += (perf_counter() - grid_started) * 1000
             if plan:
                 reference = sum(item.price for item in entries[:duration // minutes]) / (duration // minutes)
                 daily["window"] = _daily_window(plan, power_w, reference, "earliest_remaining_grid_window", "grid_only", nl)
@@ -314,10 +387,12 @@ def _daily_advice(prices, now, context, power_w, language):
                     solar_diagnostics.append("solar_forecast_interval_incomplete")
                 if missing_export_price:
                     solar_diagnostics.append("export_price_missing")
+                solar_started = perf_counter()
                 solar_plan = optimize_intervals(
                     adjusted, duration, alternatives=0, resolution_minutes=minutes,
                     window_filter=lambda window, times=solar_times: any(item.time in times for item in window),
                 )
+                solar_ms += (perf_counter() - solar_started) * 1000
                 if not solar_plan:
                     solar_diagnostics.append("no_eligible_solar_window")
                 if solar_plan:
@@ -333,6 +408,23 @@ def _daily_advice(prices, now, context, power_w, language):
         solar_diagnostics.append("no_eligible_solar_window")
     grid_windows = [day["window"] for day in days if day["window"]]
     best = min(grid_windows, key=lambda item: item["average_price_eur_kwh"], default=None)
+    total_ms = (perf_counter() - started) * 1000
+    cpu_ms = (thread_time() - cpu_started) * 1000
+    gc_counts = tuple(generation["collections"] - before for generation, before in zip(gc.get_stats(), gc_before, strict=True))
+    if total_ms >= 250:
+        _LOGGER.warning(
+            "EnerPrice Daily Advisor planning took %.1f ms "
+            "(chart: %.1f ms, grid optimization: %.1f ms, "
+            "solar optimization: %.1f ms, other: %.1f ms; resolution: %d min; "
+            "forecast preparation: %.1f ms, forecast points: %d, "
+            "chart intervals: %d, chart interpolation: %.1f ms; "
+            "thread CPU: %.1f ms, chart thread CPU: %.1f ms, chart days: %s ms; "
+            "GC collections by generation: %s, chart day GC: %s).", 
+            total_ms, chart_ms, grid_ms, solar_ms,
+            max(0.0, total_ms - chart_ms - grid_ms - solar_ms), minutes,
+            forecast_ms, forecast_points, chart_calls, chart_interpolation_ms,
+            cpu_ms, chart_cpu_ms, chart_day_ms, gc_counts, chart_day_gc,
+        )
     return {
         "state": "ready" if best else "unavailable", "best_window": best, "days": days,
         "advice": advice[:3], "chart": chart[:300], "forecast_quality": forecast.get("quality", "unavailable"),

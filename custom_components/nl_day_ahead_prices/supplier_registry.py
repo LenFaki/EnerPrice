@@ -227,7 +227,19 @@ def get_supplier_tariff(
 ) -> SupplierProfile | None:
     if custom is not None:
         return replace(custom, registry_source="custom", source_type="manual")
-    return get_supplier_profiles(on, mode=mode).get(supplier_id)
+    # Resolve only the requested supplier. Building every supplier profile for
+    # each interval-date lookup adds unnecessary work in the Daily Advisor.
+    profile = load_supplier_profiles().get(supplier_id)
+    bundled = load_registry()
+    remote = _remote_registry
+    registries = [bundled]
+    if mode != SUPPLIER_UPDATES_BUNDLED and remote is not None and remote.revision > bundled.revision:
+        registries.append(remote)
+    for registry in registries:
+        selected = select_tariff(registry, supplier_id, on)
+        if selected is not None and supplier_id != "custom":
+            profile = selected
+    return replace(profile, tariff_registry_mode=mode) if profile is not None else None
 
 
 def tariff_freshness(last_verified: str | None, on: date | datetime | None = None) -> tuple[str, int | None]:
