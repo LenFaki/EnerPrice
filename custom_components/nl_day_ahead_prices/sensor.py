@@ -825,13 +825,17 @@ class NLSmartEnergyAdvisorSensor(CoordinatorEntity[NLDayAheadPricesCoordinator],
         language = str(options.get(CONF_ADVICE_LANGUAGE, DEFAULT_ADVICE_LANGUAGE))
         if language == "auto":
             language = self.hass.config.language
-        context = None
+        # The live advisor and the Daily Advisor entities previously rebuilt the
+        # same three-day plan independently on every state change. Reuse the
+        # forecast-aware Daily Advisor cache instead; live heat advice remains
+        # uncached so current gas/grid/solar measurements still update promptly.
+        daily_result = None
         if getattr(self.coordinator, "daily_forecast", None) is not None:
-            from .daily_advisor import advisor_context
+            from .daily_advisor import daily_advice
 
-            context = advisor_context(self.coordinator)
+            daily_result = daily_advice(self.coordinator, language=language)
         with profile_advisor_gc("Smart Energy Advisor", _LOGGER):
-            return build_smart_energy_advice(
+            result = build_smart_energy_advice(
                 electricity_price=current_price(all_in, now),
                 future_prices=all_in,
                 now=now,
@@ -844,8 +848,10 @@ class NLSmartEnergyAdvisorSensor(CoordinatorEntity[NLDayAheadPricesCoordinator],
                 gas_kwh_per_m3=float(options.get(CONF_GAS_KWH_PER_M3, DEFAULT_GAS_KWH_PER_M3)),
                 solar_surplus_threshold_w=float(options.get(CONF_SOLAR_SURPLUS_THRESHOLD_W, DEFAULT_SOLAR_SURPLUS_THRESHOLD_W)),
                 language=language,
-                daily_context=context,
             )
+        if daily_result is not None:
+            result["daily_advisor"] = daily_result
+        return result
 
     @property
     def native_value(self) -> str:
