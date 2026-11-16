@@ -5,8 +5,16 @@ from datetime import datetime, timedelta, timezone
 from types import ModuleType, SimpleNamespace
 from unittest.mock import Mock
 
+import pytest
+
 from custom_components.nl_day_ahead_prices.models import PriceEntry
-from tests.test_sensor_attributes import sensor_module  # noqa: F401 - pytest fixture
+from tests.test_sensor_attributes import sensor_module as _sensor_module_fixture
+
+
+@pytest.fixture(name="sensor_module")
+def _shared_sensor_module(monkeypatch):
+    return _sensor_module_fixture.__wrapped__(monkeypatch)
+
 
 NOW = datetime(2026, 11, 14, 12, 0, tzinfo=timezone.utc)
 
