@@ -24,6 +24,20 @@ def _shared_advice_runtime(monkeypatch):
     return _advice_runtime_fixture.__wrapped__(monkeypatch)
 
 
+class _InlineWorker:
+    """Exercise scheduling independently of the separately tested process transport."""
+
+    def __init__(self):
+        self.converted = None
+
+    def calculate(self, snapshot):
+        result, self.converted = module.calculate_snapshot(snapshot, self.converted)
+        return result
+
+    def close(self):
+        self.converted = None
+
+
 @pytest.fixture
 def runtime(monkeypatch):
     prices = prices_for_day(minutes=15)
@@ -32,6 +46,7 @@ def runtime(monkeypatch):
 
     profile = normalize_supplier_profile({"name": "Custom"})
     clock = [NOW]
+    monkeypatch.setattr(module, "monotonic", lambda: clock[0].timestamp())
     entry = SimpleNamespace(data={}, options={CONF_FLEXIBLE_LOAD_POWER_W: 1000})
     entry.async_create_background_task = lambda hass, coro, name: asyncio.create_task(coro)
     hass = SimpleNamespace(config=SimpleNamespace(language="en"))
@@ -41,6 +56,7 @@ def runtime(monkeypatch):
         daily_forecast=SimpleNamespace(data=ctx["forecast"]), async_update_listeners=Mock(),
     )
     worker = module.DailyAdviceRuntime(coordinator, lambda: clock[0])
+    worker._worker = _InlineWorker()
 
     def snapshot(language):
         data = coordinator.data
@@ -48,6 +64,7 @@ def runtime(monkeypatch):
         return (
             (id(data), profile, 0., 0.), tuple(prices), profile, 0., 0.,
             coordinator.daily_forecast.data, options, clock[0], language, 15,
+            {module.market_date(item.time): profile for item in prices},
         ), data
 
     monkeypatch.setattr(worker, "_snapshot", snapshot)
@@ -156,6 +173,8 @@ async def test_unload_cancels_pending_publish(runtime):
     started, release = asyncio.Event(), asyncio.Event()
 
     async def executor(job):
+        if getattr(job, "__name__", "") == "close":
+            return job()
         started.set()
         await release.wait()
         return job()
@@ -205,3 +224,17 @@ async def test_real_ha_snapshot_is_read_on_loop_and_results_match_sync(advice_ru
     assert result == expected
     assert fixture.adapter.module.daily_advice(fixture.coordinator) is result
     await worker.async_stop()
+
+
+async def test_process_failure_backoff_applies_across_frequent_measurement_changes(runtime, monkeypatch):
+    builder = Mock(side_effect=OSError("process cannot start"))
+    monkeypatch.setattr(module, "calculate_snapshot", builder)
+    await runtime.worker.async_get()
+    for _ in range(20):
+        runtime.coordinator.daily_forecast.data = {**runtime.coordinator.daily_forecast.data, "changed": _}
+        await runtime.worker.async_get()
+    assert builder.call_count == 1
+    runtime.clock[0] += timedelta(seconds=61)
+    await runtime.worker.async_get()
+    assert builder.call_count == 2
+    await runtime.worker.async_stop()

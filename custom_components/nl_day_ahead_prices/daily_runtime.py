@@ -1,8 +1,8 @@
-"""One asynchronous Daily Advisor worker per config entry.
+"""One isolated Daily Advisor process per config entry.
 
 Only plain price/forecast snapshots enter the executor. Home Assistant state,
 registries, options and listeners are accessed exclusively on the event loop.
-This does not change process-wide GC policy: Python GC can still hold the GIL.
+The child interpreter has its own GIL and GC; no HA GC policy is changed.
 """
 
 from __future__ import annotations
@@ -11,13 +11,16 @@ import asyncio
 import logging
 from datetime import timezone
 from functools import partial
+from time import monotonic
 
 from .advisor_gc import profile_advisor_gc
+from .advisor_process import AdvisorProcess
 from .calculations import all_in_entries_for_supplier, export_entries_for_supplier
 from .const import CONF_ADVICE_LANGUAGE, CONF_DAILY_DURATION_MINUTES, CONF_FLEXIBLE_LOAD_POWER_W
 from .daily_cache import advice_time_bucket
 from .models import PriceEntry
 from .smart_energy import build_smart_energy_advice
+from .supplier_registry import get_supplier_tariff, market_date
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,11 +33,11 @@ def calculate_snapshot(snapshot, converted):
 
 def _calculate_snapshot(snapshot, converted):
     """Pure worker: reuse tariff conversions across changing measurements."""
-    price_key, raw, profile, tax, vat, forecast, options, now, language, resolution = snapshot
+    price_key, raw, profile, tax, vat, forecast, options, now, language, resolution, tariffs = snapshot
     if converted is None or converted[0] != price_key:
-        prices = all_in_entries_for_supplier(raw, tax, profile, vat)
+        prices = all_in_entries_for_supplier(raw, tax, profile, vat, tariffs_by_date=tariffs)
         utc_prices = [PriceEntry(item.time.astimezone(timezone.utc), item.price) for item in prices]
-        exports = export_entries_for_supplier(raw, profile, vat)
+        exports = export_entries_for_supplier(raw, profile, vat, tariffs_by_date=tariffs)
         converted = (price_key, utc_prices, exports)
     context = {
         "forecast": forecast, "export_prices": converted[2],
@@ -58,9 +61,9 @@ class DailyAdviceRuntime:
         self._utcnow = utcnow
         self._results = {}
         self._failed = {}
+        self._retry_after = 0.0
         self._wanted = {}
-        self._converted = None
-        self._source = None
+        self._worker = AdvisorProcess()
         self._task = None
         self._stopped = False
         # Do not publish an old price/day/forecast plan while a new one is pending.
@@ -93,7 +96,7 @@ class DailyAdviceRuntime:
         record = self._results.get(language)
         if record is not None and record[0] == signature:
             return record[1]
-        if not self._stopped and self._failed.get(language) != signature:
+        if not self._stopped and monotonic() >= self._retry_after and self._failed.get(language) != signature:
             self._wanted[language] = signature
             if self._task is None:
                 self._task = self.coordinator.entry.async_create_background_task(
@@ -120,12 +123,22 @@ class DailyAdviceRuntime:
         tax, vat = _energy_tax(coordinator.entry), _vat(coordinator.entry)
         # Retain the source object as well as its identity so identities cannot
         # be reused while an executor job still owns the previous snapshot.
-        price_key = (id(data), profile, tax, vat)
         raw = tuple(data.result.prices) if data else ()
+        tariffs = {}
+        for item in raw:
+            day = market_date(item.time)
+            if day not in tariffs:
+                tariffs[day] = profile
+                if profile.key != "custom" and profile.registry_source != "custom":
+                    tariffs[day] = get_supplier_tariff(profile.key, day, mode=profile.tariff_registry_mode) or profile
+        # Remote registry state belongs to HA, not the spawned interpreter.
+        # Send the resolved tariff for each market date, including future dates.
+        price_key = (id(data), profile, tax, vat, tariffs)
         resolution = 15 if data and data.result.effective_price_resolution == "quarter_hour" else 60
         return (
             price_key, raw, profile, tax, vat, coordinator.daily_forecast.snapshot(),
-            options, self._utcnow(), language, resolution,
+            {key: options[key] for key in (CONF_DAILY_DURATION_MINUTES, CONF_FLEXIBLE_LOAD_POWER_W) if key in options},
+            self._utcnow(), language, resolution, tariffs,
         ), data
 
     async def _run(self):
@@ -136,13 +149,16 @@ class DailyAdviceRuntime:
                 signature = self._signature(language)
                 try:
                     snapshot, source = self._snapshot(language)
-                    result, converted = await self.hass.async_add_executor_job(
-                        partial(calculate_snapshot, snapshot, self._converted)
+                    result = await self.hass.async_add_executor_job(
+                        partial(self._worker.calculate, snapshot)
                     )
                 except Exception:  # noqa: BLE001 -- background job must report failure and stop retry storms
+                    if self._stopped:
+                        return
                     _LOGGER.exception("EnerPrice Daily Advisor calculation failed")
                     self._failed[language] = signature
-                    self._wanted.pop(language, None)
+                    self._retry_after = monotonic() + 60
+                    self._wanted.clear()
                     continue
                 if self._stopped:
                     return
@@ -151,9 +167,6 @@ class DailyAdviceRuntime:
                 if signature != self._signature(language):
                     self._wanted[language] = self._signature(language)
                     continue
-                # Keep source alive alongside its tariff conversions.
-                self._converted = converted
-                self._source = source
                 self._results[language] = (signature, result, source)
                 self._failed.pop(language, None)
                 self._wanted.pop(language, None)
@@ -164,13 +177,13 @@ class DailyAdviceRuntime:
     async def async_stop(self):
         self._stopped = True
         self._wanted.clear()
+        # Termination runs in the I/O executor and also releases a blocked recv.
+        await self.hass.async_add_executor_job(self._worker.close)
         if self._task is not None:
             self._task.cancel()
             try:
                 await self._task
             except asyncio.CancelledError:
                 pass
-        self._converted = None
-        self._source = None
         self._results.clear()
         self._failed.clear()
