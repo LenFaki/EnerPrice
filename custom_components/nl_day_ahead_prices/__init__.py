@@ -50,10 +50,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     coordinator.daily_forecast = None
     coordinator.daily_delivery = None
+    coordinator.daily_advice_runtime = None
     if {**entry.data, **entry.options}.get(CONF_DAILY_ADVISOR_ENABLED, False):
         from .daily_advisor import DailyForecastCoordinator
 
         coordinator.daily_forecast = DailyForecastCoordinator(hass, entry)
+        from homeassistant.util import dt as dt_util
+
+        from .daily_runtime import DailyAdviceRuntime
+
+        coordinator.daily_advice_runtime = DailyAdviceRuntime(coordinator, dt_util.utcnow)
         from .daily_delivery import DailyAdvisorDelivery
 
         coordinator.daily_delivery = DailyAdvisorDelivery(coordinator)
@@ -85,6 +91,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         delivery = getattr(hass.data[DOMAIN][entry.entry_id], "daily_delivery", None)
         if delivery is not None:
             await delivery.async_stop()
+        runtime = getattr(hass.data[DOMAIN][entry.entry_id], "daily_advice_runtime", None)
+        if runtime is not None:
+            await runtime.async_stop()
         daily = getattr(hass.data[DOMAIN][entry.entry_id], "daily_forecast", None)
         if daily is not None:
             await daily.async_stop()

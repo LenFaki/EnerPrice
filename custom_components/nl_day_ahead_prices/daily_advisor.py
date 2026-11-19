@@ -143,6 +143,9 @@ def _forecast_change_reasons(before, after):
 
 def daily_advice(coordinator, language=None):
     """One cached result shared by the new Daily Advisor entities."""
+    runtime = getattr(coordinator, "daily_advice_runtime", None)
+    if runtime is not None:
+        return runtime.get(language)
     from .sensor import _cached_all_in_entries
     from .smart_energy import build_smart_energy_advice
 
@@ -194,6 +197,14 @@ def daily_advice(coordinator, language=None):
             )
         cache["daily_advice"] = (signature, result)
     return cache["daily_advice"][1]
+
+
+async def async_daily_advice(coordinator, language=None):
+    """Await the prepared plan for delivery/service callers."""
+    runtime = getattr(coordinator, "daily_advice_runtime", None)
+    if runtime is not None:
+        return await runtime.async_get(language)
+    return daily_advice(coordinator, language)
 
 
 def selected_entities(options):

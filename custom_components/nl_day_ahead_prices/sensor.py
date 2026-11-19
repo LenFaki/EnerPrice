@@ -978,7 +978,9 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
         )
         all_in_attributes = shared_price_attributes["all_in_prices"]
         sell_entries = _cached_sell_entries(self.coordinator, data, self.entry)
-        sell_attributes = [entry.as_attribute() for entry in sell_entries]
+        sell_attributes = _cached_value(
+            self.coordinator, "sell_price_attributes", lambda: [entry.as_attribute() for entry in sell_entries]
+        )
         base = {
             **shared_price_attributes,
             "all_in_prices_today": all_in_attributes[:today_count],
@@ -1030,7 +1032,7 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
             "supplier_profile_last_verified": supplier_profile.last_verified,
             "supplier_profile_source_url": supplier_profile.source_url,
             "supplier_profile": supplier_profile_to_dict(supplier_profile),
-            **_cheapest_block_attributes(data),
+            **_cached_value(self.coordinator, "cheapest_block_attributes", lambda: _cheapest_block_attributes(data)),
             "current_interval_start": current_entry.time.isoformat() if current_entry else None,
             "current_interval_end": next_entry.time.isoformat() if next_entry else None,
             "next_interval_start": next_entry.time.isoformat() if next_entry else None,
@@ -1061,8 +1063,12 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
                 "peak_periods",
                 lambda: _periods(data, self.entry, self.coordinator.runtime_options, peak=True, prices=all_in_entries),
             )
-            base["best_periods"] = [period.as_dict() for period in best_periods]
-            base["peak_periods"] = [period.as_dict() for period in peak_periods]
+            base["best_periods"] = _cached_value(
+                self.coordinator, "best_period_attributes", lambda: [period.as_dict() for period in best_periods]
+            )
+            base["peak_periods"] = _cached_value(
+                self.coordinator, "peak_period_attributes", lambda: [period.as_dict() for period in peak_periods]
+            )
         if self.entity_description.analysis_key and self.entity_description.analysis_key.startswith("volatility_"):
             if self.entity_description.analysis_key == "volatility_today":
                 base.update(volatility(all_in_entries[: len(data.result.prices_today)]))
