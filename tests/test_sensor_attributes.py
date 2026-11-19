@@ -511,3 +511,32 @@ def test_smart_advisor_calculates_once_per_state_write(sensor_module, monkeypatc
     assert sensor.extra_state_attributes["recommendation"] == "result 2"
     assert sensor.native_value == "cheap_grid"
     assert len(calls) == 2
+
+
+def test_expensive_attribute_payloads_are_shared_between_entities(sensor_module, monkeypatch):
+    """Twenty price sensors must not repeat seven block searches each."""
+    sensor = make_sensor(sensor_module, day_prices("2026-09-08", 15), extended=True)
+    cache = {}
+
+    def cached(key, factory):
+        if key not in cache:
+            cache[key] = factory()
+        return cache[key]
+
+    sensor.coordinator.cached_analysis = cached
+    from custom_components.nl_day_ahead_prices.const import CONF_CHART_HELPERS
+
+    sensor.coordinator.runtime_options[CONF_CHART_HELPERS] = True
+    blocks = Mock(wraps=sensor_module._cheapest_block_attributes)
+    monkeypatch.setattr(sensor_module, "_cheapest_block_attributes", blocks)
+    first = sensor.extra_state_attributes
+    for _ in range(19):
+        attrs = sensor.extra_state_attributes
+        assert attrs["sell_prices_today"] == first["sell_prices_today"]
+        assert attrs["cheapest_1_hour"] is first["cheapest_1_hour"]
+        assert attrs["best_periods"] is first["best_periods"]
+    blocks.assert_called_once()
+    cache.clear()  # New coordinator cycle must rebuild from the new price data.
+    rebuilt = sensor.extra_state_attributes
+    assert rebuilt["cheapest_1_hour"] == first["cheapest_1_hour"]
+    assert blocks.call_count == 2

@@ -184,7 +184,7 @@ class DailyAdvisorDelivery:
         return True
 
     async def async_process(self):
-        from .daily_advisor import daily_advice
+        from .daily_advisor import async_daily_advice
 
         async with self._lock:
             if self._stopped or not self._loaded:
@@ -194,7 +194,9 @@ class DailyAdvisorDelivery:
             language = options.get(CONF_ADVICE_LANGUAGE, "auto")
             if language == "auto":
                 language = self.hass.config.language
-            advice = daily_advice(self.coordinator, language)
+            advice = await async_daily_advice(self.coordinator, language)
+            if self._stopped:
+                return
             before = [row["date"] for row in self.history["days"]]
             update_history(self.history, now, self.coordinator.daily_forecast.snapshot(), advice, options.get(CONF_DAILY_RETENTION_DAYS, 30))
             if before != [row["date"] for row in self.history["days"]] or self._last_save is None or now - self._last_save >= timedelta(minutes=15):

@@ -61,14 +61,22 @@ def optimize_intervals(
     if len(prices) < count:
         return None
     if require_consecutive:
-        candidates = _consecutive_candidates(prices, count, minutes)
+        candidates = _iter_consecutive_candidates(prices, count, minutes)
         if window_filter is not None:
-            candidates = [candidate for candidate in candidates if window_filter(candidate)]
-        if not candidates:
-            return None
-        ranked = sorted(candidates, key=lambda entries: _average(entries))
-        selected = ranked[0]
-        other = ranked[1 : alternatives + 1]
+            candidates = (candidate for candidate in candidates if window_filter(candidate))
+        if alternatives == 0:
+            # Daily planning only needs one window. Do not retain and sort every
+            # candidate (up to 96 lists per day, repeated on live meter updates).
+            selected = min(candidates, key=_average, default=None)
+            if selected is None:
+                return None
+            other = []
+        else:
+            ranked = sorted(candidates, key=_average)
+            if not ranked:
+                return None
+            selected = ranked[0]
+            other = ranked[1 : alternatives + 1]
     else:
         if window_filter is not None:
             raise ValueError("Window filters require consecutive planning")
@@ -96,18 +104,18 @@ def window_payload(entries: list[PriceEntry], minutes: int | None = None) -> dic
 
 
 def _consecutive_candidates(prices: list[PriceEntry], count: int, minutes: int) -> list[list[PriceEntry]]:
+    return list(_iter_consecutive_candidates(prices, count, minutes))
+
+
+def _iter_consecutive_candidates(prices: list[PriceEntry], count: int, minutes: int):
+    """Stream windows, checking each adjacent boundary once in absolute time."""
     ordered = sorted(prices, key=lambda item: _utc(item.time))
-    result = []
-    for index in range(len(ordered) - count + 1):
-        candidate = ordered[index : index + count]
-        if all(
-            _elapsed(later.time, earlier.time) == timedelta(minutes=minutes)
-            for earlier, later in zip(  # noqa: B905 - Python 3.9 compatibility.
-                candidate, candidate[1:]
-            )
-        ):
-            result.append(candidate)
-    return result
+    run = 0
+    step = timedelta(minutes=minutes)
+    for index, item in enumerate(ordered):
+        run = run + 1 if index and _elapsed(item.time, ordered[index - 1].time) == step else 1
+        if run >= count:
+            yield ordered[index - count + 1:index + 1]
 
 
 def _average(entries: list[PriceEntry]) -> float:
