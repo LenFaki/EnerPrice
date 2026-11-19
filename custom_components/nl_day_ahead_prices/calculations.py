@@ -13,6 +13,7 @@ from .supplier_registry import get_supplier_tariff, market_date
 
 def all_in_entries_for_supplier(
     prices: list[PriceEntry], energy_tax: float, supplier_profile: SupplierProfile, vat: float,
+    *, tariffs_by_date: dict[date, SupplierProfile] | None = None,
 ) -> list[PriceEntry]:
     """Use the applicable local-date tariff; keep custom overrides constant."""
     profiles_by_date: dict[date, SupplierProfile] = {}
@@ -20,7 +21,9 @@ def all_in_entries_for_supplier(
     custom = supplier_profile.key == "custom" or supplier_profile.registry_source == "custom"
     for item in prices:
         profile = supplier_profile
-        if not custom:
+        if tariffs_by_date is not None:
+            profile = tariffs_by_date[market_date(item.time)]
+        elif not custom:
             day = market_date(item.time)
             if day not in profiles_by_date:
                 profiles_by_date[day] = get_supplier_tariff(profile.key, day, mode=supplier_profile.tariff_registry_mode) or profile
@@ -38,6 +41,7 @@ def build_all_in_price_attributes_for_supplier(
 
 def export_entries_for_supplier(
     prices: list[PriceEntry], supplier_profile: SupplierProfile, vat: float, *, include_fee: bool = True,
+    tariffs_by_date: dict[date, SupplierProfile] | None = None,
 ) -> list[PriceEntry]:
     """Apply existing export-fee semantics at each interval's local tariff date."""
     profiles = {}
@@ -46,7 +50,9 @@ def export_entries_for_supplier(
         day = market_date(item.time)
         if day not in profiles:
             profiles[day] = supplier_profile
-            if supplier_profile.key != "custom" and supplier_profile.registry_source != "custom":
+            if tariffs_by_date is not None:
+                profiles[day] = tariffs_by_date[day]
+            elif supplier_profile.key != "custom" and supplier_profile.registry_source != "custom":
                 profiles[day] = get_supplier_tariff(supplier_profile.key, day, mode=supplier_profile.tariff_registry_mode) or supplier_profile
         if include_fee:
             price = calculate_sell_price(item.price, profiles[day], vat)
