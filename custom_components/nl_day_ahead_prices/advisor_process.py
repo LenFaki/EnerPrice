@@ -10,7 +10,9 @@ from __future__ import annotations
 import logging
 import multiprocessing
 import os
+import runpy
 from contextlib import suppress
+from pathlib import Path
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,6 +38,7 @@ def _process_main(connection):
     logger.propagate = False
     converted = None
     try:
+        connection.send({"ready": True, "pid": os.getpid()})
         while True:
             try:
                 snapshot = connection.recv()
@@ -58,7 +61,7 @@ def _process_main(connection):
 class AdvisorProcess:
     """One bounded request at a time; caller owns serialization of jobs."""
 
-    def __init__(self, *, timeout=15.0, worker_target=_process_main):
+    def __init__(self, *, timeout=15.0, worker_target=None):
         self.timeout = timeout
         self._target = worker_target
         self._process = None
@@ -70,7 +73,19 @@ class AdvisorProcess:
             raise RuntimeError("Daily Advisor process is closed")
         context = multiprocessing.get_context("spawn")
         parent, child = context.Pipe()
-        process = context.Process(target=self._target, args=(child,), name="EnerPrice Daily Advisor", daemon=True)
+        if self._target is None:
+            # HA removes /config from sys.path after mounting custom_components.
+            # A target in our package cannot be unpickled in the fresh child.
+            # Start with an importable stdlib target; bootstrap the package path
+            # in the child only, before receiving any EnerPrice model objects.
+            process = context.Process(
+                target=runpy.run_path,
+                args=(str(Path(__file__).with_name("advisor_worker.py").resolve()),),
+                kwargs={"run_name": "__enerprice_worker__", "init_globals": {"connection": child}},
+                name="EnerPrice Daily Advisor", daemon=True,
+            )
+        else:
+            process = context.Process(target=self._target, args=(child,), name="EnerPrice Daily Advisor", daemon=True)
         try:
             process.start()
         except BaseException:
@@ -83,6 +98,16 @@ class AdvisorProcess:
         if self._closed:
             self._dispose()
             raise RuntimeError("Daily Advisor process is closed")
+        try:
+            if not parent.poll(self.timeout):
+                raise TimeoutError("Daily Advisor process startup timed out")
+            ready = parent.recv()
+            if not isinstance(ready, dict) or ready.get("ready") is not True:
+                error = ready.get("error", "invalid handshake") if isinstance(ready, dict) else "invalid handshake"
+                raise RuntimeError(f"Daily Advisor process bootstrap failed ({error})")
+        except BaseException:
+            self._dispose()
+            raise
 
     def calculate(self, snapshot):
         """Blocking IPC only; calculation executes in the separate process."""

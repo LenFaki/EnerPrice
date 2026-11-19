@@ -31,6 +31,7 @@ def snapshot():
 
 def cpu_and_gc_worker(connection):
     try:
+        connection.send({"ready": True})
         connection.recv()
         # Exercise a genuinely separate GIL and GC graph, not a sleeping thread.
         started = time.thread_time()
@@ -49,11 +50,13 @@ def cpu_and_gc_worker(connection):
 
 
 def stalled_worker(connection):
+    connection.send({"ready": True})
     connection.recv()
     time.sleep(30)
 
 
 def crashed_worker(connection):
+    connection.send({"ready": True})
     connection.recv()
     os._exit(2)
 
@@ -158,3 +161,75 @@ async def test_child_calculation_error_is_bounded_and_next_input_can_restart():
         assert (await asyncio.to_thread(client.calculate, snapshot()))["state"] == "ready"
     finally:
         await asyncio.to_thread(client.close)
+
+
+def failed_bootstrap_worker(connection):
+    connection.send({"ready": False, "error": "ModuleNotFoundError"})
+    connection.close()
+
+
+async def test_startup_failure_reports_bootstrap_error_and_cleans_up():
+    client = AdvisorProcess(worker_target=failed_bootstrap_worker)
+    try:
+        with pytest.raises(RuntimeError, match="bootstrap failed.*ModuleNotFoundError"):
+            await asyncio.to_thread(client.calculate, snapshot())
+        assert client._process is None and client._connection is None
+    finally:
+        await asyncio.to_thread(client.close)
+
+
+def test_spawn_from_ha_style_temporary_import_path(tmp_path):
+    """HA mounts custom_components then removes its config directory from sys.path.
+
+    Run outside the checkout, without PYTHONPATH and without reimporting this
+    project in the child's __mp_main__. The beta.12 target fails during unpickle
+    here, exactly matching the field ConnectionResetError on Python 3.14.
+    """
+    import json
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    driver = tmp_path / "ha_style_driver.py"
+    driver.write_text('''
+import json
+import os
+import sys
+
+if __name__ == "__main__":
+    root = sys.argv[1]
+    sys.path.insert(0, root)
+    from datetime import datetime, timedelta, timezone
+    from custom_components.nl_day_ahead_prices.advisor_process import AdvisorProcess
+    from custom_components.nl_day_ahead_prices.models import PriceEntry
+    from custom_components.nl_day_ahead_prices.supplier_profiles import normalize_supplier_profile
+    from custom_components.nl_day_ahead_prices.supplier_registry import market_date
+    profile = normalize_supplier_profile({"name": "Custom"})
+    now = datetime(2026, 11, 19, 0, tzinfo=timezone.utc)
+    prices = tuple(PriceEntry(now + timedelta(hours=i), .3) for i in range(48))
+    tariffs = {market_date(row.time): profile for row in prices}
+    inputs = ((1, profile, .1, .21, tariffs), prices, profile, .1, .21, {}, {}, now, "en", 60, tariffs)
+    sys.path.remove(root)
+    before = tuple(sys.path)
+    client = AdvisorProcess()
+    try:
+        result = client.calculate(inputs)
+        pid = client._process.pid
+        again = client.calculate(inputs)
+        assert client._process.pid == pid
+        assert result == again
+        assert tuple(sys.path) == before
+        print(json.dumps({"state": result["state"], "pid": pid, "parent": os.getpid()}))
+    finally:
+        client.close()
+''')
+    env = {key: value for key, value in os.environ.items() if key != "PYTHONPATH"}
+    root = Path(__file__).parents[1]
+    result = subprocess.run(
+        [sys.executable, str(driver), str(root)], cwd=tmp_path, env=env,
+        capture_output=True, text=True, timeout=25, check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["state"] == "ready"
+    assert payload["pid"] != payload["parent"]
