@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import partial
+from math import isfinite
 from typing import Any
 
 import voluptuous as vol
@@ -93,6 +94,14 @@ from .const import (
     SUPPLIER_UPDATES_AUTOMATIC,
     SUPPLIER_UPDATES_BUNDLED,
 )
+from .contract_pricing import (
+    CONF_POWERPEERS_CONFIRMED,
+    POWERPEERS,
+    POWERPEERS_FLAGS,
+    POWERPEERS_NUMBERS,
+    validate_powerpeers,
+)
+from .market import COUNTRIES, market_country, validate_market
 from .price_resolution import PRICE_RESOLUTION_AUTO, PRICE_RESOLUTION_HOURLY, PRICE_RESOLUTION_QUARTER_HOUR
 from .remote_registry import STORAGE_KEY
 from .supplier_registry import get_supplier_profiles, supplier_update_mode
@@ -110,12 +119,16 @@ class NLDayAheadPricesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         await self.async_set_unique_id(DOMAIN)
         self._abort_if_unique_id_configured()
         if user_input is not None:
-            return self.async_create_entry(title=user_input[CONF_NAME], data=user_input)
+            errors = _validate_market_options(user_input)
+            if not errors:
+                return self.async_create_entry(title=user_input[CONF_NAME], data=user_input)
+        else:
+            errors = {}
 
         schema = vol.Schema(
             {
                 vol.Optional(CONF_NAME, default=NAME): str,
-                vol.Optional(CONF_COUNTRY, default=DEFAULT_COUNTRY): str,
+                vol.Optional(CONF_COUNTRY, default=DEFAULT_COUNTRY): vol.In(COUNTRIES),
                 vol.Optional(CONF_CURRENCY, default=DEFAULT_CURRENCY): str,
                 vol.Optional(CONF_PRIMARY_PROVIDER, default=DEFAULT_PRIMARY_PROVIDER): vol.In(
                     [PROVIDER_NORD_POOL, PROVIDER_ENERGY_CHARTS]
@@ -124,7 +137,7 @@ class NLDayAheadPricesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Optional(CONF_ENTSOE_API_TOKEN, default=""): str,
             }
         )
-        return self.async_show_form(step_id="user", data_schema=schema)
+        return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
 
     @staticmethod
     def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> NLDayAheadPricesOptionsFlow:
@@ -143,7 +156,7 @@ class NLDayAheadPricesOptionsFlow(config_entries.OptionsFlow):
         """Manage options."""
         data = self._current_options()
         if user_input is not None:
-            errors = _validate_base_options(user_input)
+            errors = _validate_base_options({**data, **user_input})
             if errors:
                 return self.async_show_form(
                     step_id="init",
@@ -151,11 +164,57 @@ class NLDayAheadPricesOptionsFlow(config_entries.OptionsFlow):
                     errors=errors,
                 )
             self._pending_options = {**data, **user_input}
+            if market_country(self._pending_options) == "BE":
+                return await self.async_step_belgian_market()
+            if self._pending_options.get(CONF_SELECTED_SUPPLIER) == POWERPEERS:
+                if data.get(CONF_SELECTED_SUPPLIER) != POWERPEERS:
+                    self._pending_options.pop(CONF_POWERPEERS_CONFIRMED, None)
+                return await self.async_step_powerpeers_contract()
             if self._pending_options.get(CONF_SELECTED_SUPPLIER) == CUSTOM_SUPPLIER_KEY:
                 return await self.async_step_custom_supplier()
             return await self.async_step_supplier_summary()
 
         return self.async_show_form(step_id="init", data_schema=await self._async_base_options_schema(data))
+
+    async def async_step_belgian_market(self, user_input=None):
+        """Confirm the wholesale-only scope without overwriting NL contract settings."""
+        if user_input is not None:
+            return self.async_create_entry(title="", data=self._pending_options)
+        return self.async_show_form(step_id="belgian_market", data_schema=vol.Schema({}))
+
+    async def async_step_powerpeers_contract(self, user_input=None):
+        """Require the actual customer's contract before enabling Powerpeers."""
+        data = self._pending_options
+        errors = {}
+        if user_input is not None:
+            try:
+                validate_powerpeers(user_input)
+            except ValueError:
+                errors["base"] = "invalid_powerpeers_contract"
+            else:
+                self._pending_options = {**data, **user_input}
+                return await self.async_step_smart_setup()
+        # Never borrow an earlier custom supplier's fees as Powerpeers defaults.
+        confirmed = data.get(CONF_POWERPEERS_CONFIRMED) is True
+        values = {key: data[key] for key in (*POWERPEERS_NUMBERS, *POWERPEERS_FLAGS) if confirmed and key in data}
+        values = {**values, **(user_input or {})}
+        schema = {}
+        for key in POWERPEERS_NUMBERS:
+            suggested = values.get(key)
+            if suggested is None and key != CONF_CUSTOM_MONTHLY_FEE_ELECTRICITY:
+                suggested = .01
+            marker = vol.Required(key, default=suggested) if suggested is not None else vol.Required(key)
+            schema[marker] = vol.All(vol.Coerce(float), vol.Range(min=0))
+        for key in POWERPEERS_FLAGS:
+            if key in values:
+                marker = vol.Required(key, default=values[key])
+            elif key != CONF_CUSTOM_SELL_MARKET_PRICE_INCLUDES_VAT:
+                marker = vol.Required(key, default=True)
+            else:
+                marker = vol.Required(key)
+            schema[marker] = bool
+        schema[vol.Required(CONF_POWERPEERS_CONFIRMED, default=False)] = bool
+        return self.async_show_form(step_id="powerpeers_contract", data_schema=vol.Schema(schema), errors=errors)
 
     async def async_step_supplier_summary(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Show selected supplier profile details before saving."""
@@ -356,16 +415,31 @@ class NLDayAheadPricesOptionsFlow(config_entries.OptionsFlow):
         return {**self.config_entry.data, **self.config_entry.options}
 
     async def _async_base_options_schema(self, data: dict[str, Any]) -> vol.Schema:
+        try:
+            market_country(data)
+        except ValueError:
+            data = {**data, CONF_COUNTRY: DEFAULT_COUNTRY}
+        if market_country(data) == "BE":
+            return vol.Schema({
+                vol.Optional(CONF_COUNTRY, default="BE"): vol.In(COUNTRIES),
+                vol.Optional(CONF_CURRENCY, default="EUR"): vol.In(["EUR"]),
+                vol.Optional(CONF_PRIMARY_PROVIDER, default=data.get(CONF_PRIMARY_PROVIDER, DEFAULT_PRIMARY_PROVIDER)): vol.In([PROVIDER_NORD_POOL, PROVIDER_ENERGY_CHARTS]),
+                vol.Optional(CONF_ENABLE_ENTSOE, default=data.get(CONF_ENABLE_ENTSOE, False)): bool,
+                vol.Optional(CONF_ENTSOE_API_TOKEN, default=data.get(CONF_ENTSOE_API_TOKEN, "")): str,
+                vol.Optional(CONF_PRICE_RESOLUTION, default=data.get(CONF_PRICE_RESOLUTION, DEFAULT_PRICE_RESOLUTION)):
+                    SelectSelector(SelectSelectorConfig(options=[PRICE_RESOLUTION_AUTO, PRICE_RESOLUTION_HOURLY, PRICE_RESOLUTION_QUARTER_HOUR], translation_key=CONF_PRICE_RESOLUTION)),
+            })
         profiles = await self._async_supplier_profiles(data)
         supplier_choices = {key: profile.name for key, profile in profiles.items()} or {
             CUSTOM_SUPPLIER_KEY: DEFAULT_CUSTOM_SUPPLIER_NAME
         }
+        supplier_choices[POWERPEERS] = "Powerpeers (eigen contract / own contract)"
         selected_supplier = data.get(CONF_SELECTED_SUPPLIER, DEFAULT_SELECTED_SUPPLIER)
         if selected_supplier not in supplier_choices:
             selected_supplier = DEFAULT_SELECTED_SUPPLIER if DEFAULT_SELECTED_SUPPLIER in supplier_choices else CUSTOM_SUPPLIER_KEY
         schema = vol.Schema(
             {
-                vol.Optional(CONF_COUNTRY, default=data.get(CONF_COUNTRY, DEFAULT_COUNTRY)): str,
+                vol.Optional(CONF_COUNTRY, default=data.get(CONF_COUNTRY, DEFAULT_COUNTRY)): vol.In(COUNTRIES),
                 vol.Optional(CONF_DAILY_ADVISOR_ENABLED, default=data.get(CONF_DAILY_ADVISOR_ENABLED, False)): bool,
                 vol.Optional(CONF_CURRENCY, default=data.get(CONF_CURRENCY, DEFAULT_CURRENCY)): str,
                 vol.Optional(CONF_PRIMARY_PROVIDER, default=data.get(CONF_PRIMARY_PROVIDER, DEFAULT_PRIMARY_PROVIDER)): vol.In(
@@ -455,9 +529,23 @@ class NLDayAheadPricesOptionsFlow(config_entries.OptionsFlow):
         )
 
 
+def _validate_market_options(options):
+    try:
+        market_country(options)
+    except ValueError:
+        return {CONF_COUNTRY: "unsupported_market"}
+    try:
+        validate_market(options)
+    except ValueError:
+        return {CONF_CURRENCY: "belgium_eur_only"}
+    return {}
+
+
 def _validate_base_options(user_input: dict[str, Any]) -> dict[str, str]:
     """Validate main option ranges."""
-    errors: dict[str, str] = {}
+    errors = _validate_market_options(user_input)
+    if not errors and market_country(user_input) == "BE":
+        return errors
     vat = _float_option(user_input, CONF_VAT, DEFAULT_VAT)
     energy_tax = _float_option(user_input, CONF_ENERGY_TAX, DEFAULT_ENERGY_TAX)
     if vat is None or vat < 0 or vat > 1:
@@ -482,7 +570,8 @@ def _validate_custom_supplier_options(user_input: dict[str, Any]) -> dict[str, s
 def _float_option(user_input: dict[str, Any], key: str, default: float) -> float | None:
     """Read an option as float without raising from the options flow."""
     try:
-        return float(user_input.get(key, default))
+        value = float(user_input.get(key, default))
+        return value if isfinite(value) else None
     except (TypeError, ValueError):
         return None
 

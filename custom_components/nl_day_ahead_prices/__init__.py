@@ -37,9 +37,15 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up EnerPrice from a config entry."""
+    from .contract_pricing import POWERPEERS, powerpeers_profile
     from .coordinator import NLDayAheadPricesCoordinator
+    from .market import validate_market, wholesale_only
     from .supplier_registry import get_supplier_profiles
 
+    options = {**entry.data, **entry.options}
+    validate_market(options)
+    if not wholesale_only(entry) and options.get("selected_supplier") == POWERPEERS:
+        powerpeers_profile(options)
     _LOGGER.info("Setting up EnerPrice config entry %s", entry.entry_id)
     await hass.async_add_executor_job(get_supplier_profiles)
     from .remote_registry import async_get_manager, async_subscribe
@@ -51,7 +57,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator.daily_forecast = None
     coordinator.daily_delivery = None
     coordinator.daily_advice_runtime = None
-    if {**entry.data, **entry.options}.get(CONF_DAILY_ADVISOR_ENABLED, False):
+    if not wholesale_only(entry) and options.get(CONF_DAILY_ADVISOR_ENABLED, False):
         from .daily_advisor import DailyForecastCoordinator
 
         coordinator.daily_forecast = DailyForecastCoordinator(hass, entry)
@@ -75,7 +81,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
     entry.async_on_unload(async_subscribe(
         hass, registry_manager, coordinator.registry_updated,
-        enabled=supplier_update_mode({**entry.data, **entry.options}) == SUPPLIER_UPDATES_AUTOMATIC,
+        enabled=not wholesale_only(entry) and supplier_update_mode({**entry.data, **entry.options}) == SUPPLIER_UPDATES_AUTOMATIC,
     ))
     hass.async_create_task(coordinator.async_refresh())
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
@@ -104,7 +110,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Apply local settings without fetching; reload only for provider changes."""
+    """Apply analysis settings locally; rebuild when contracts or inputs change."""
+    from .market import wholesale_only
     from .remote_registry import async_update_subscription
 
     coordinator = hass.data[DOMAIN][entry.entry_id]
@@ -117,7 +124,7 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
                 coordinator.runtime_options[key] = current.get(key, default)
         async_update_subscription(
             hass, coordinator.registry_manager, coordinator.registry_updated,
-            supplier_update_mode(current) == SUPPLIER_UPDATES_AUTOMATIC,
+            not wholesale_only(entry) and supplier_update_mode(current) == SUPPLIER_UPDATES_AUTOMATIC,
         )
         return
     await hass.config_entries.async_reload(entry.entry_id)
@@ -136,6 +143,12 @@ def _requires_reload(previous: dict, current: dict) -> bool:
         previous.get(key, default) != current.get(key, default)
         for key, default in MARKET_PROVIDER_DEFAULTS.items()
     ):
+        return True
+    # Contract settings affect cached series, selected entities and auto resolution.
+    from .contract_pricing import CONF_POWERPEERS_CONFIRMED, POWERPEERS_FLAGS, POWERPEERS_NUMBERS
+    pricing_keys = ("selected_supplier", "price_resolution", "energy_tax", "energy_tax_incl_vat", "vat",
+                    "custom_supplier_name", CONF_POWERPEERS_CONFIRMED, *POWERPEERS_NUMBERS, *POWERPEERS_FLAGS)
+    if any(previous.get(key) != current.get(key) for key in pricing_keys):
         return True
     smart_listener_keys = (
         CONF_DAILY_ADVISOR_ENABLED,

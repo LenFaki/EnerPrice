@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "EnerPrice",
-        "description": "Stel Nederlandse day-ahead stroomprijzen in.",
+        "description": "Kies Nederland voor contractprijzen of België voor alleen marktprijzen (EUR/kWh, exclusief btw, belastingen, nettarieven en leverancierskosten).",
         "data": {
           "name": "Naam",
           "country": "Land / biedzone",
@@ -13,13 +13,17 @@
           "entsoe_api_token": "ENTSO-E API-token"
         }
       }
+    },
+    "error": {
+      "unsupported_market": "Kies NL of BE.",
+      "belgium_eur_only": "Belgische marktprijzen zijn alleen beschikbaar in EUR."
     }
   },
   "options": {
     "step": {
       "init": {
         "title": "EnerPrice-opties",
-        "description": "Kies je provider, belastinginstellingen en leverancier. De velden voor eigen tarieven verschijnen alleen in de volgende stap wanneer Eigen leverancier is gekozen.",
+        "description": "Nederland: kies je leverancier en contractinstellingen. België: alleen marktprijzen en verbruiksplanning; Nederlandse contract-, belasting- en adviesinstellingen zijn daar niet actief.",
         "data": {
           "country": "Land / biedzone",
           "currency": "Valuta",
@@ -101,6 +105,23 @@
           "smart_solar_surplus_threshold_w": "Minimaal betekenisvol gemeten zonne-overschot in W voordat EnerPrice dit als gedeeltelijk overschot behandelt.",
           "smart_advice_language": "Taal voor de aanbeveling van de Smart Energy Advisor."
         }
+      },
+      "belgian_market": {
+        "title": "België: alleen marktprijzen",
+        "description": "EUR/kWh, exclusief btw, belastingen, nettarieven en leverancierskosten. Beschikbaar: marktprijzen, prijsperiodes en verbruiksplanning. Niet beschikbaar: Belgische all-inprijzen, injectievergoeding, batterijrendement en financieel dagelijks advies. Opgeslagen Nederlandse instellingen blijven bewaard voor terugschakelen."
+      },
+      "powerpeers_contract": {
+        "title": "Powerpeers-contract",
+        "description": "Vul de bedragen uit je eigen contract of dashboard in. €0,01/kWh is een gepubliceerde suggestie, geen universeel contracttarief. Maandkosten hebben geen standaardwaarde. Controleer alle btw-keuzes. Berekening per interval; saldering op jaarbasis en de maandelijkse nulgrens zijn geen gerealiseerde opbrengst. Vanaf 2027 is het marktdeel exclusief btw; tot en met 2029 geldt de gepubliceerde minimumformule vóór aftrek van de verkoopvergoeding.",
+        "data": {
+          "custom_monthly_fee_electricity": "Vaste stroomkosten per maand (incl. btw, uit eigen contract)",
+          "custom_purchase_fee_electricity": "Inkoopvergoeding stroom",
+          "custom_purchase_fee_includes_vat": "Inkoopvergoeding is inclusief btw",
+          "custom_sell_fee_electricity": "Verkoopvergoeding stroom",
+          "custom_sell_fee_includes_vat": "Verkoopvergoeding is inclusief btw",
+          "custom_sell_market_price_includes_vat": "Marktdeel teruglevering vóór 2027 inclusief btw (controleer contract)",
+          "powerpeers_contract_confirmed": "Ik heb deze tarieven en btw-keuzes gecontroleerd in mijn Powerpeers-contract"
+        }
       }
     },
     "error": {
@@ -117,7 +138,10 @@
       "daily_invalid_retention": "Kies een geheel aantal dagen van 1 tot en met 90.",
       "daily_invalid_time": "Kies een geldige lokale tijd met seconden op 00.",
       "daily_invalid_notify_target": "Kies een beschikbaar Companion-app- of HA-notificatiedoel.",
-      "daily_invalid_counter": "Kies een cumulatieve energiemeter met state_class total_increasing."
+      "daily_invalid_counter": "Kies een cumulatieve energiemeter met state_class total_increasing.",
+      "unsupported_market": "Kies NL of BE.",
+      "belgium_eur_only": "Belgische marktprijzen zijn alleen beschikbaar in EUR.",
+      "invalid_powerpeers_contract": "Vul alle contractbedragen en btw-keuzes in en bevestig dat je ze hebt gecontroleerd."
     }
   },
   "selector": {
@@ -352,8 +376,14 @@
       "name": "EnerPrice-dashboard maken",
       "description": "Maak Lovelace-YAML die handmatig in een dashboard kan worden geplakt.",
       "fields": {
-        "include_daily_advisor": {"name": "Daily Advisor tonen", "description": "Optioneel: gebruiksvensters, zonneprognoses en driedaagse vooruitblik."},
-        "use_apexcharts": {"name": "ApexCharts gebruiken", "description": "Schakel uit voor een dashboard met alleen ingebouwde kaarten."},
+        "include_daily_advisor": {
+          "name": "Daily Advisor tonen",
+          "description": "Optioneel: gebruiksvensters, zonneprognoses en driedaagse vooruitblik."
+        },
+        "use_apexcharts": {
+          "name": "ApexCharts gebruiken",
+          "description": "Schakel uit voor een dashboard met alleen ingebouwde kaarten."
+        },
         "dashboard_type": {
           "name": "Dashboardtype",
           "description": "Kies een compact, volledig of adviesdashboard."
@@ -421,11 +451,29 @@
   },
   "entity": {
     "sensor": {
-      "daily_energy_advice": {"name": "Dagelijks energieadvies", "state": {"ready": "Advies beschikbaar", "unavailable": "Onvoldoende gegevens"}},
-      "best_consumption_window": {"name": "Beste gebruiksvenster"},
-      "solar_forecast_today": {"name":"Zonneprognose vandaag"},
-      "solar_forecast_tomorrow": {"name":"Zonneprognose morgen"},
-      "daily_forecast_quality": {"name":"Datakwaliteit zonneprognose","state":{"partial":"Gedeeltelijk beschikbaar","unavailable":"Niet beschikbaar"}},
+      "daily_energy_advice": {
+        "name": "Dagelijks energieadvies",
+        "state": {
+          "ready": "Advies beschikbaar",
+          "unavailable": "Onvoldoende gegevens"
+        }
+      },
+      "best_consumption_window": {
+        "name": "Beste gebruiksvenster"
+      },
+      "solar_forecast_today": {
+        "name": "Zonneprognose vandaag"
+      },
+      "solar_forecast_tomorrow": {
+        "name": "Zonneprognose morgen"
+      },
+      "daily_forecast_quality": {
+        "name": "Datakwaliteit zonneprognose",
+        "state": {
+          "partial": "Gedeeltelijk beschikbaar",
+          "unavailable": "Niet beschikbaar"
+        }
+      },
       "supplier_tariff_status": {
         "name": "Status leverancierstarief",
         "state": {

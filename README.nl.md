@@ -20,6 +20,12 @@ all-in tarieven, prijsanalyses, beste periodes, trends, prognoses en praktisch
 energieadvies. De standaard biedzone is `NL`, de valuta is `EUR` en prijzen
 worden als `EUR/kWh` aangeboden.
 
+## Powerpeers en België (v2.7)
+
+Kies **Powerpeers** in de opties en bevestig de bedragen en btw-keuzes uit je eigen contract. Maandkosten hebben geen standaardwaarde. Zie [Powerpeers instellen en rekenregels](docs/powerpeers-tariff-review.md).
+
+Kies **BE — alleen marktprijzen** voor Belgische marktprijzen en verbruiksplanning in EUR/kWh, exclusief btw, belastingen, nettarieven en leverancierskosten. Belgische all-inprijzen, injectievergoeding en financieel advies zijn niet beschikbaar. Zie [Belgische ondersteuning](docs/belgium-support-plan.md).
+
 ## Wat voegt EnerPrice toe (en wat niet)?
 
 Gebruik je al een leveranciersintegratie zoals Zonneplan? Dan heb je mogelijk

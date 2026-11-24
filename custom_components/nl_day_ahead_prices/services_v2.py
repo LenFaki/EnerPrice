@@ -32,6 +32,8 @@ from .const import (
     DOMAIN,
 )
 from .dashboard import generate_automation_yaml, generate_dashboard_yaml
+from .market import pricing_metadata, wholesale_only
+from .market_dashboard import generate_market_dashboard_yaml
 from .models import PriceEntry, current_price
 from .planning import plan_appliance, plan_battery, plan_ev_charging, plan_export, plan_heating
 from .sensor import _energy_tax, _selected_supplier_profile, _vat
@@ -44,7 +46,7 @@ SERVICE_SCHEMAS = {
             vol.Required("max_power_kw"): vol.All(vol.Coerce(float), vol.Range(min=0.01)),
             vol.Optional("earliest_start"): cv.datetime,
             vol.Required("deadline"): cv.datetime,
-            vol.Optional("price_type", default="all_in"): vol.In(["market", "all_in"]),
+            vol.Optional("price_type"): vol.In(["market", "all_in"]),
             vol.Optional("require_consecutive", default=True): cv.boolean,
             vol.Optional("minimum_session_minutes", default=60): vol.All(vol.Coerce(int), vol.Range(min=15)),
             vol.Optional("allow_split_sessions", default=False): cv.boolean,
@@ -57,7 +59,7 @@ SERVICE_SCHEMAS = {
             vol.Optional("earliest_start"): cv.datetime,
             vol.Required("deadline"): cv.datetime,
             vol.Optional("prefer_before_peak", default=True): cv.boolean,
-            vol.Optional("price_type", default="all_in"): vol.In(["market", "all_in"]),
+            vol.Optional("price_type"): vol.In(["market", "all_in"]),
             vol.Optional("minimum_gap_minutes", default=0): vol.All(vol.Coerce(int), vol.Range(min=0)),
         }
     ),
@@ -72,7 +74,7 @@ SERVICE_SCHEMAS = {
             vol.Optional("roundtrip_efficiency_percent", default=90): vol.All(
                 vol.Coerce(float), vol.Range(min=1, max=100)
             ),
-            vol.Optional("price_type", default="all_in"): vol.In(["market", "all_in"]),
+            vol.Optional("price_type"): vol.In(["market", "all_in"]),
             vol.Optional("allow_grid_charge", default=True): cv.boolean,
             vol.Optional("allow_export", default=False): cv.boolean,
         }
@@ -81,7 +83,7 @@ SERVICE_SCHEMAS = {
         {
             vol.Optional("expected_export_kwh"): vol.Coerce(float),
             vol.Optional("duration_minutes", default=60): vol.All(vol.Coerce(int), vol.Range(min=15)),
-            vol.Optional("price_type", default="sell"): vol.In(["market", "all_in", "sell"]),
+            vol.Optional("price_type"): vol.In(["market", "all_in", "sell"]),
             vol.Optional("include_supplier_sell_fee", default=True): cv.boolean,
         }
     ),
@@ -172,6 +174,8 @@ def async_register_v2_services(hass: HomeAssistant) -> None:
             language = data.get("language", "auto")
             if language == "auto":
                 data["language"] = "nl" if hass.config.language.startswith("nl") else "en"
+            if wholesale_only(coordinator.entry):
+                return {"yaml": generate_market_dashboard_yaml(entity_ids, **data), **pricing_metadata(coordinator.entry)}
             return {
                 "yaml": generate_dashboard_yaml(
                     **data,
@@ -180,8 +184,21 @@ def async_register_v2_services(hass: HomeAssistant) -> None:
                 )
             }
         if name == "generate_automation_yaml":
+            coordinator = _coordinator(hass)
+            if coordinator is not None and wholesale_only(coordinator.entry):
+                if data["automation_type"] in {"battery_charge_discharge", "notify_expensive_period", "notify_cheap_period"}:
+                    return {"error": "This automation needs contract-based entities unavailable in Belgian mode", **pricing_metadata(coordinator.entry)}
+                entity_id = _dashboard_entity_ids(hass, coordinator.entry.entry_id).get("best_price_period")
+                if entity_id is None:
+                    return {"error": "The best market-price period entity is not available"}
+                return {"yaml": "# BE wholesale only; excludes VAT, taxes, grid tariffs and supplier fees.\n" + generate_automation_yaml(**data, trigger_entity=entity_id), **pricing_metadata(coordinator.entry)}
             return {"yaml": generate_automation_yaml(**data)}
         coordinator = _coordinator(hass, data.pop("config_entry_id", None))
+        if coordinator is not None and wholesale_only(coordinator.entry):
+            if name in {"get_smart_energy_advice", "find_best_export_window", "find_battery_strategy"}:
+                return {"error": "Belgian mode supports wholesale consumption planning only; contract-based advice and export revenue are unavailable.", **pricing_metadata(coordinator.entry)}
+            if data.get("price_type", "market") != "market":
+                return {"error": "Belgian mode supports price_type=market only (excludes VAT, taxes and supplier fees).", **pricing_metadata(coordinator.entry)}
         if coordinator is None or coordinator.data is None:
             if coordinator is not None and name == "get_smart_energy_advice" and getattr(coordinator, "daily_forecast", None) is not None:
                 from .daily_advisor import async_daily_advice
@@ -224,7 +241,8 @@ def async_register_v2_services(hass: HomeAssistant) -> None:
                 **data,
             )
             return _serialize(result)
-        prices = _prices(coordinator, data.pop("price_type", "all_in"), data.get("include_supplier_sell_fee", True))
+        default_type = "market" if wholesale_only(coordinator.entry) else ("sell" if name == "find_best_export_window" else "all_in")
+        prices = _prices(coordinator, data.pop("price_type", default_type), data.get("include_supplier_sell_fee", True))
         now = dt_util.now()
         data.setdefault("earliest_start", now)
         if name == "find_best_charging_window":
@@ -240,7 +258,10 @@ def async_register_v2_services(hass: HomeAssistant) -> None:
             result = plan_export(prices, **data)
         else:
             result = plan_appliance(prices, **data)
-        return _serialize(result)
+        result = _serialize(result)
+        if wholesale_only(coordinator.entry):
+            result.update(pricing_metadata(coordinator.entry))
+        return result
 
     for service, schema in SERVICE_SCHEMAS.items():
         if not hass.services.has_service(DOMAIN, service):
@@ -308,9 +329,11 @@ def _dashboard_entity_ids(hass: HomeAssistant, config_entry_id: str) -> dict[str
 
 def _prices(coordinator, price_type: str, include_sell_fee: bool) -> list[PriceEntry]:
     entry = coordinator.entry
-    profile = _selected_supplier_profile(entry)
     if price_type == "market":
         return coordinator.data.result.prices
+    if wholesale_only(entry):
+        raise ValueError("Belgian mode supports wholesale market prices only")
+    profile = _selected_supplier_profile(entry)
     if price_type == "sell":
         return export_entries_for_supplier(
             coordinator.data.result.prices, profile, _vat(entry), include_fee=include_sell_fee

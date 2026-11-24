@@ -36,7 +36,6 @@ find_best_charging_window:
       required: true
       selector: {datetime: {}}
     price_type:
-      default: all_in
       selector: {select: {options: [market, all_in]}}
     require_consecutive:
       default: true
@@ -65,7 +64,6 @@ find_best_heating_window:
       default: true
       selector: {boolean: {}}
     price_type:
-      default: all_in
       selector: {select: {options: [market, all_in]}}
     minimum_gap_minutes:
       default: 0
@@ -95,7 +93,6 @@ find_battery_strategy:
       default: 90
       selector: {number: {min: 50, max: 100, step: 1, unit_of_measurement: "%"}}
     price_type:
-      default: all_in
       selector: {select: {options: [market, all_in]}}
     allow_grid_charge:
       default: true
@@ -112,7 +109,6 @@ find_best_export_window:
       default: 60
       selector: {number: {min: 15, max: 1440, step: 15, unit_of_measurement: min}}
     price_type:
-      default: sell
       selector: {select: {options: [market, all_in, sell]}}
     include_supplier_sell_fee:
       default: true

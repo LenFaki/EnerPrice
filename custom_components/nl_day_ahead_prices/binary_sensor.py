@@ -15,6 +15,7 @@ from homeassistant.util import dt as dt_util
 from .analysis.periods import active_and_next
 from .const import DOMAIN
 from .coordinator import NLDayAheadPricesCoordinator
+from .market import pricing_metadata, wholesale_only
 from .models import PriceData
 from .sensor import _periods, _v2_data
 
@@ -115,7 +116,8 @@ DESCRIPTIONS = (
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     """Set up binary sensors."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities(PriceBinarySensor(coordinator, entry, description) for description in DESCRIPTIONS)
+    async_add_entities(PriceBinarySensor(coordinator, entry, description) for description in DESCRIPTIONS
+                       if not wholesale_only(entry) or not description.v2_helper)
 
 
 class PriceBinarySensor(CoordinatorEntity[NLDayAheadPricesCoordinator], BinarySensorEntity):
@@ -146,11 +148,12 @@ class PriceBinarySensor(CoordinatorEntity[NLDayAheadPricesCoordinator], BinarySe
     @property
     def extra_state_attributes(self) -> dict:
         if self.coordinator.data is None or self.entity_description.period_type is None:
-            return {}
+            return pricing_metadata(self.entry) if wholesale_only(self.entry) else {}
         peak = self.entity_description.period_type == "peak"
         periods = _periods(self.coordinator.data, self.entry, self.coordinator.runtime_options, peak=peak)
         active, upcoming = active_and_next(periods, dt_util.now())
         return {
+            **pricing_metadata(self.entry),
             "active_period": active.as_dict() if active else None,
             "next_period": upcoming.as_dict() if upcoming else None,
             "periods": [period.as_dict() for period in periods],

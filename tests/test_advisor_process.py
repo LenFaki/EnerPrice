@@ -233,3 +233,22 @@ if __name__ == "__main__":
     payload = json.loads(result.stdout)
     assert payload["state"] == "ready"
     assert payload["pid"] != payload["parent"]
+
+
+async def test_powerpeers_confirmed_contract_survives_real_spawn():
+    from custom_components.nl_day_ahead_prices.contract_pricing import powerpeers_profile
+    from tests.test_powerpeers_contract import contract
+
+    inputs = list(snapshot())
+    profile = powerpeers_profile(contract(custom_purchase_fee_electricity=.03))
+    tariffs = {market_date(item.time): profile for item in inputs[1]}
+    inputs[0] = (3, profile, .1, .21, tariffs)
+    inputs[2], inputs[10] = profile, tariffs
+    expected, _ = calculate_snapshot(tuple(inputs), None)
+    client = AdvisorProcess()
+    try:
+        actual = await asyncio.to_thread(client.calculate, tuple(inputs))
+        assert actual == expected
+        assert actual["days"][0]["window"]["average_price_eur_kwh"] == round(.3 * 1.21 + .1 + .03, 6)
+    finally:
+        await asyncio.to_thread(client.close)

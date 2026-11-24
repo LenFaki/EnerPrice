@@ -31,6 +31,12 @@ price analysis, best periods, trends, forecasts and energy advice.
 Slimme day-ahead stroomprijzen, all-in tarieven, kwartierprijzen, analyses en
 energieadvies voor Home Assistant.
 
+## Powerpeers and Belgium (v2.7)
+
+Select **Powerpeers** in options and confirm the fees and VAT choices from your own contract. Monthly charges have no default. See [Powerpeers setup and calculation rules](docs/powerpeers-tariff-review.md).
+
+Select **BE — wholesale only** for Belgian market prices and consumption planning in EUR/kWh, excluding VAT, taxes, grid tariffs and supplier fees. Belgian all-in prices, injection revenue and financial advice are unavailable. See [Belgian support](docs/belgium-support-plan.md).
+
 ## What EnerPrice adds (and what it doesn't)
 
 If you already use a supplier integration such as Zonneplan, you may already

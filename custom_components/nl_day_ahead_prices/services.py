@@ -9,6 +9,7 @@ from homeassistant.helpers import config_validation as cv
 from .analysis.chart_export import apexcharts_yaml, export_prices
 from .calculations import all_in_entries_for_supplier
 from .const import DOMAIN
+from .market import pricing_metadata, wholesale_only
 from .sensor import _energy_tax, _selected_supplier_profile, _vat
 
 EXPORT_SERVICE = "export_chart_data"
@@ -18,7 +19,7 @@ EXPORT_SCHEMA = vol.Schema(
     {
         vol.Optional("include_today", default=True): cv.boolean,
         vol.Optional("include_tomorrow", default=True): cv.boolean,
-        vol.Optional("price_type", default="all_in"): vol.In(["market", "all_in"]),
+        vol.Optional("price_type"): vol.In(["market", "all_in"]),
         vol.Optional("resolution", default="auto"): vol.In(["auto", "hourly", "quarter_hour"]),
         vol.Optional("include_best_periods", default=False): cv.boolean,
         vol.Optional("include_peak_periods", default=False): cv.boolean,
@@ -59,7 +60,10 @@ def async_register_services(hass: HomeAssistant) -> None:
             prices.extend(data.result.prices_today)
         if call.data["include_tomorrow"]:
             prices.extend(data.result.prices_tomorrow)
-        if call.data["price_type"] == "all_in":
+        price_type = call.data.get("price_type", "market" if wholesale_only(coordinator.entry) else "all_in")
+        if wholesale_only(coordinator.entry) and price_type != "market":
+            return {"error": "Belgian mode supports price_type=market only", **pricing_metadata(coordinator.entry)}
+        if price_type == "all_in":
             entry = coordinator.entry
             prices = all_in_entries_for_supplier(
                 prices, _energy_tax(entry), _selected_supplier_profile(entry), _vat(entry)
@@ -74,6 +78,7 @@ def async_register_services(hass: HomeAssistant) -> None:
 
         runtime = coordinator.runtime_options
         return {
+            **(pricing_metadata(coordinator.entry) if wholesale_only(coordinator.entry) else {}),
             "prices": export_prices(prices, call.data["resolution"]),
             "best_periods": [
                 item.as_dict()
@@ -87,9 +92,13 @@ def async_register_services(hass: HomeAssistant) -> None:
 
     async def async_config(call: ServiceCall) -> dict:
         coordinator = _coordinator(hass)
-        entity_id = "sensor.nl_day_ahead_prices_current_market_price"
-        if coordinator is not None:
-            entity_id = f"sensor.{coordinator.entry.title.lower().replace(' ', '_')}_current_market_price"
+        from .services_v2 import _dashboard_entity_ids
+
+        if coordinator is None:
+            return {"error": "No EnerPrice config entry is loaded"}
+        entity_id = _dashboard_entity_ids(hass, coordinator.entry.entry_id).get("current_market_price")
+        if entity_id is None:
+            return {"error": "The current market price entity is not available"}
         return {"yaml": apexcharts_yaml(entity_id)}
 
     hass.services.async_register(DOMAIN, EXPORT_SERVICE, async_export, schema=EXPORT_SCHEMA, supports_response=SupportsResponse.ONLY)
