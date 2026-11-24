@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  lint-test:
+  lint-test-matrix:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -38,6 +38,14 @@ jobs:
         run: python scripts/audit_supplier_registry.py --validate-only --compare-ref "$BASE_REF"
       - name: Audit issue lifecycle tests (mocked GitHub API)
         run: node --test tests/test_supplier_audit_issue.cjs
+
+  lint-test:
+    needs: lint-test-matrix
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all supported Python checks
+        run: test "${{ needs.lint-test-matrix.result }}" = "success"
 
   release:
     needs: lint-test

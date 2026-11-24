@@ -156,3 +156,18 @@ def test_missing_dutch_notes_blocks_tag_creation(monkeypatch):
     with pytest.raises(ValueError, match="English and Nederlands"):
         release.execute(publish=True)
     assert not any(call[:2] == ("git", "tag") for call in calls)
+
+
+def test_required_lint_test_gate_aggregates_supported_python_matrix():
+    from pathlib import Path
+
+    import yaml
+
+    workflow = yaml.safe_load((Path(__file__).parents[1] / '.github/workflows/ci.yml').read_text())
+    jobs = workflow['jobs']
+    assert set(jobs['lint-test-matrix']['strategy']['matrix']['python-version']) == {'3.12', '3.14'}
+    gate = jobs['lint-test']
+    assert gate['needs'] == 'lint-test-matrix'
+    assert gate['if'] == 'always()'
+    assert gate['steps'][0]['run'] == 'test "${{ needs.lint-test-matrix.result }}" = "success"'
+    assert jobs['release']['needs'] == 'lint-test'
