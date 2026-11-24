@@ -21,13 +21,25 @@ from .const import (
     REQUEST_RETRIES,
     REQUEST_TIMEOUT,
 )
+from .market import validate_market
 from .models import PriceEntry, ProviderResult, convert_to_eur_kwh
 from .price_resolution import infer_price_resolution
 
 _LOGGER = logging.getLogger(__name__)
 
-ENTSOE_NL_DOMAIN = "10YNL----------L"
+ENTSOE_DOMAINS = {
+    "NL": "10YNL----------L",
+    "BE": "10YBE----------2",
+}
 AMSTERDAM_TZ = ZoneInfo("Europe/Amsterdam")
+
+
+def entsoe_domain(country: str) -> str:
+    """Return the ENTSO-E bidding-zone EIC; never fall back silently to NL."""
+    try:
+        return ENTSOE_DOMAINS[country.upper()]
+    except KeyError as err:
+        raise ValueError(f"Unsupported ENTSO-E bidding zone: {country}") from err
 
 
 class ProviderError(Exception):
@@ -50,7 +62,7 @@ class BasePriceProvider(ABC):
         currency: str = DEFAULT_CURRENCY,
     ) -> None:
         self.session = session
-        self.country = country
+        self.country = validate_market({"country": country, "currency": currency})
         self.currency = currency
 
     @abstractmethod
@@ -205,8 +217,8 @@ class EntsoeProvider(BasePriceProvider):
             {
                 "securityToken": self.api_token,
                 "documentType": "A44",
-                "in_Domain": ENTSOE_NL_DOMAIN,
-                "out_Domain": ENTSOE_NL_DOMAIN,
+                "in_Domain": entsoe_domain(self.country),
+                "out_Domain": entsoe_domain(self.country),
                 "periodStart": start,
                 "periodEnd": end,
             },

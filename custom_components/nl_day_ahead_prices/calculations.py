@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
+from .contract_pricing import POWERPEERS, powerpeers_export_price
 from .models import PriceEntry
 from .supplier_profiles import SupplierProfile
 from .supplier_profiles import normalize_supplier_profile as _normalize_supplier_profile
@@ -54,7 +55,9 @@ def export_entries_for_supplier(
                 profiles[day] = tariffs_by_date[day]
             elif supplier_profile.key != "custom" and supplier_profile.registry_source != "custom":
                 profiles[day] = get_supplier_tariff(supplier_profile.key, day, mode=supplier_profile.tariff_registry_mode) or supplier_profile
-        if include_fee:
+        if profiles[day].key == POWERPEERS:
+            price = powerpeers_export_price(item.price, profiles[day], vat, day, include_fee=include_fee)
+        elif include_fee:
             price = calculate_sell_price(item.price, profiles[day], vat)
         else:
             price = calculate_sell_market_price(item.price, profiles[day], vat)

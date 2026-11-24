@@ -1,8 +1,22 @@
-# EnerPrice 2.6 — Wat is nieuw en hoe gebruik je het?
+# EnerPrice 2.7 — Gebruikershandleiding
 
 **Taal:** [English](enerprice-v2-6-user-guide.md) | Nederlands
 
-EnerPrice 2.6 voegt de **Dagelijkse Energieadviseur** toe. Deze functie is optioneel: bestaande prijzen, sensoren en automatiseringen blijven werken. EnerPrice adviseert; het schakelt zelf geen apparaten in of uit.
+EnerPrice 2.7 ondersteunt Nederlandse contractprijzen en Belgische marktprijsplanning. De **Dagelijkse Energieadviseur** is optioneel en beschikbaar in NL-modus. EnerPrice adviseert; het schakelt zelf geen apparaten in of uit.
+
+## Begin met de juiste markt
+
+Open **Instellingen → Apparaten & diensten → EnerPrice → Configureren**.
+
+- **NL:** kies je leverancier en controleer energiebelasting en btw. All-inprijzen en financieel advies zijn ramingen op basis van deze instellingen.
+- **Powerpeers (NL):** vul je maandkosten inclusief btw, inkoop- en verkoopvergoeding en btw-keuzes in. Controleer de voorgestelde €0,01/kWh met je eigen contract en vink de bevestiging aan. Maandkosten hebben geen standaardwaarde. Zie [tariefregels en grenzen](powerpeers-tariff-review.md).
+- **BE:** kies EUR en je prijsprovider. Je krijgt marktprijzen, trends, beste/piekperiodes en verbruiksplanning, exclusief btw, belastingen, nettarieven en leverancierskosten. Belgische all-inprijzen, injectieopbrengst en financieel Smart/Dagelijks advies zijn niet beschikbaar. Zie [Belgische ondersteuning](belgium-support-plan.md).
+
+Gebruik voor BE `generate_dashboard_yaml`: dit maakt een marktprijsdashboard met echte entiteits-ID's. Verbruiksplanning en grafiekexport gebruiken standaard marktprijzen; een expliciete all-inkeuze wordt geweigerd. Bij een landwissel blijven Nederlandse instellingen bewaard, maar worden ze in BE niet gebruikt. Een oude Nederlandse prijscache wordt niet hergebruikt.
+
+Powerpeers kiest automatisch kwartierprijzen en volgt de terugleverregels per marktinterval, inclusief de wijziging vanaf 2027. Jaarsaldering en de maandelijkse nulgrens worden niet als factuur berekend.
+
+De volgende stappen voor dagelijks en zonbewust financieel advies gelden voor **NL-modus**.
 
 ## In vijf stappen beginnen
 
@@ -30,7 +44,7 @@ Gebruik in de EnerPrice-opties:
 - **Actuele zonneproductie**: een sensor in **W**. Bij meerdere omvormers kun je de vermogens via een Home Assistant-templatesensor optellen.
 - **Flexibel apparaat**: het nominale vermogen in **W** en de gewenste gebruiksduur.
 
-EnerPrice schat het huidige huishoudelijke basisverbruik uit **zonnevermogen + netvermogen**. Beide metingen moeten recent genoeg zijn en bij elkaar passen. In 2.6.2 wordt een gecontroleerd venster van maximaal **vijf minuten** gebruikt: beide metingen mogen hoogstens vijf minuten oud zijn en hoogstens vijf minuten uit elkaar liggen. Verouderde metingen worden niet stilzwijgend als actueel gebruikt.
+EnerPrice schat het huidige huishoudelijke basisverbruik uit **zonnevermogen + netvermogen**. Beide metingen moeten recent genoeg zijn en bij elkaar passen. Er wordt een gecontroleerd venster van maximaal **vijf minuten** gebruikt: beide metingen mogen hoogstens vijf minuten oud zijn en hoogstens vijf minuten uit elkaar liggen. Verouderde metingen worden niet stilzwijgend als actueel gebruikt.
 
 Voor een economisch zonnescenario zijn ook bruikbare **terugleverprijzen** voor de betreffende intervallen nodig. Ontbreekt een noodzakelijke invoer, dan blijft het normale netstroomadvies beschikbaar en meldt EnerPrice waarom het zonnescenario ontbreekt.
 
@@ -63,7 +77,7 @@ Voor de optionele energieprestatiecontrole zijn **cumulatieve**, niet dagelijks 
 
 ## Dashboardvoorbeelden
 
-Deze zes schermafbeeldingen tonen tabbladen van een bestaande Home Assistant-installatie, vastgelegd op 26 oktober 2026. Entiteitsnamen, leveranciersprijzen, instellingen en meetwaarden verschillen per gebruiker. Het gaat om een zelf ingericht Sections-dashboard; EnerPrice installeert dit niet automatisch.
+Deze Nederlandse voorbeelden bevatten functies die in BE-modus niet beschikbaar zijn. Deze zes schermafbeeldingen tonen tabbladen van een bestaande Home Assistant-installatie, vastgelegd op 26 oktober 2026. Entiteitsnamen, leveranciersprijzen, instellingen en meetwaarden verschillen per gebruiker. Het gaat om een zelf ingericht Sections-dashboard; EnerPrice installeert dit niet automatisch.
 
 ### Overzicht: stroomprijzen en advies
 
@@ -96,6 +110,12 @@ Het netstroomadvies en het voorwaardelijke zonnescenario zijn afzonderlijk. Verw
 Genereer een dashboard via `nl_day_ahead_prices.generate_dashboard_yaml` met `include_daily_advisor: true`. Zonder ApexCharts kun je `use_apexcharts: false` gebruiken. Bestaande dashboards worden **niet automatisch overschreven**.
 
 **Aanbevolen opbouw:** begin met alleen prijzen en het netstroomadvies; voeg daarna zon toe, vervolgens eventueel meldingen en als laatste prestatiecontrole. Zo hoef je niet alle geavanceerde opties tegelijk in te stellen.
+
+## Bijwerken en probleemoplossing
+
+Werk bij via HACS en herstart Home Assistant. Vanaf v2.6.10 berekent een apart, hergebruikt Python-proces het dagelijkse advies. Die prestatieoplossing blijft behouden in v2.7. Veranderde contractbedragen herladen de prijsberekeningen.
+
+Ontbreekt een advies direct na opstarten, geef de eerste berekening gelegenheid af te ronden. Bij terugkerende fouten: vermeld versie, entiteit, tijdstip en de volledige foutmelding in een GitHub-issue. Een losse trage sensorupdate bewijst op zichzelf geen fout in de adviesberekening. Ontbrekende morgenprijzen kunnen betekenen dat de veiling nog niet gepubliceerd is.
 
 ## Grenzen en veiligheid
 

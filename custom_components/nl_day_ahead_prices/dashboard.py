@@ -362,6 +362,7 @@ def generate_automation_yaml(
     notify_service: str = "notify.notify",
     duration_minutes: int = 120,
     deadline: str | None = None,
+    trigger_entity: str | None = None,
 ) -> str:
     """Generate an editable Home Assistant automation."""
     binary = {
@@ -372,6 +373,7 @@ def generate_automation_yaml(
         "battery_charge_discharge": "binary_sensor.nl_day_ahead_prices_best_price_period",
         "ev_charge_before_deadline": "binary_sensor.nl_day_ahead_prices_best_price_period",
     }[automation_type]
+    binary = trigger_entity or binary
     is_notification = automation_type.startswith("notify_")
     action = (
         f"""      - action: {notify_service}

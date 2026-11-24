@@ -2,12 +2,14 @@
   "domain": "nl_day_ahead_prices",
   "name": "EnerPrice",
   "after_dependencies": [],
-  "codeowners": ["@LenFaki"],
+  "codeowners": [
+    "@LenFaki"
+  ],
   "config_flow": true,
   "documentation": "https://github.com/LenFaki/EnerPrice",
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/LenFaki/EnerPrice/issues",
   "requirements": [],
-  "version": "2.6.10"
+  "version": "2.7.0"
 }

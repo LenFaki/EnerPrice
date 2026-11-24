@@ -1,5 +1,9 @@
 # EnerPrice dashboard recipes
 
+## Choose the market (v2.7)
+
+The all-in, Price Advisor and Smart/Daily examples below apply to **NL**. For **BE**, use `nl_day_ahead_prices.generate_dashboard_yaml`: it resolves actual market-price entities and labels the excluded VAT and charges. Belgian all-in, injection-revenue and battery-advice cards are unavailable. See the [current user guide](enerprice-v2-6-user-guide.md) and [Belgian support](belgium-support-plan.md).
+
 These recipes are copy-ready starting points for Home Assistant. Replace example entity IDs with the IDs from your installation. EnerPrice remains advisory: examples do not directly control a device unless you deliberately build an automation around the returned advice.
 
 ## 1. Current all-in price

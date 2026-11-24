@@ -338,7 +338,8 @@ def test_three_sensors_have_stable_ids_and_bounded_attributes(adapter, monkeypat
 
 
 @pytest.mark.parametrize("enabled", [False, True])
-async def test_entry_setup_nonblocking_and_optional_unload(adapter, monkeypatch, enabled):
+@pytest.mark.parametrize("country", ["NL", "BE"])
+async def test_entry_setup_nonblocking_and_optional_unload(adapter, monkeypatch, enabled, country):
     from custom_components.nl_day_ahead_prices import async_setup_entry, async_unload_entry
 
     price = SimpleNamespace(async_start=AsyncMock(), async_stop=AsyncMock(), async_refresh=AsyncMock(), registry_updated=Mock())
@@ -360,6 +361,8 @@ async def test_entry_setup_nonblocking_and_optional_unload(adapter, monkeypatch,
     hass, entry = adapter.hass, adapter.entry
     price.hass, price.entry = hass, entry
     entry.options[CONF_DAILY_ADVISOR_ENABLED] = enabled
+    entry.options["country"] = country
+    enabled = enabled and country == "NL"
     entry.async_on_unload = Mock()
     entry.add_update_listener = Mock()
     entry.async_create_background_task = Mock(side_effect=lambda hass, coro, name: coro.close())

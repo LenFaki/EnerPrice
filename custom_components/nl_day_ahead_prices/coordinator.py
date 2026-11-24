@@ -37,6 +37,8 @@ from .const import (
     PROVIDER_NORD_POOL,
     RUNTIME_DEFAULTS,
 )
+from .contract_pricing import POWERPEERS
+from .market import entry_options, market_country, wholesale_only
 from .models import PriceData, PriceEntry, ProviderResult
 from .price_resolution import (
     PRICE_RESOLUTION_AUTO,
@@ -203,6 +205,8 @@ class NLDayAheadPricesCoordinator(DataUpdateCoordinator[PriceData]):
     async def _async_store_cached(self, data: PriceData) -> None:
         await self.store.async_save(
             {
+                "country": market_country(entry_options(self.entry)),
+                "currency": entry_options(self.entry).get(CONF_CURRENCY, DEFAULT_CURRENCY),
                 "provider": data.result.provider,
                 "prices_today": [entry.as_attribute() for entry in data.result.prices_today],
                 "prices_tomorrow": [entry.as_attribute() for entry in data.result.prices_tomorrow],
@@ -226,6 +230,11 @@ class NLDayAheadPricesCoordinator(DataUpdateCoordinator[PriceData]):
     async def _async_load_cached(self) -> PriceData | None:
         cached = await self.store.async_load()
         now = dt_util.now()
+        # Legacy caches are NL/EUR. Never reuse their prices after changing market.
+        options = entry_options(self.entry)
+        if cached and (cached.get("country", DEFAULT_COUNTRY) != market_country(options)
+                       or cached.get("currency", DEFAULT_CURRENCY) != options.get(CONF_CURRENCY, DEFAULT_CURRENCY)):
+            return None
         if not cache_is_valid(cached, now):
             return None
         current = get_cached_prices_for_date(cached, now.date())
@@ -291,6 +300,8 @@ class NLDayAheadPricesCoordinator(DataUpdateCoordinator[PriceData]):
         options = self.entry.options
         data = self.entry.data
         selected_supplier = options.get(CONF_SELECTED_SUPPLIER, data.get(CONF_SELECTED_SUPPLIER, DEFAULT_SELECTED_SUPPLIER))
+        if wholesale_only(self.entry) or selected_supplier == POWERPEERS:
+            return "quarter_hour"
         profiles = get_supplier_profiles(now, mode=supplier_update_mode({**data, **options}))
         profile = profiles.get(selected_supplier) or profiles.get(DEFAULT_SELECTED_SUPPLIER)
         if profile is None:

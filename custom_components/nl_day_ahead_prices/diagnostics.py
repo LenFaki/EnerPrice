@@ -9,6 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
 from .const import CONF_CHART_HELPERS, CONF_SELECTED_SUPPLIER, DOMAIN, PROVIDER_NAMES
+from .market import pricing_metadata, wholesale_only
 from .registry_status import registry_status, tariff_status
 from .sensor import _selected_supplier_profile, _v2_data
 from .supplier_registry import supplier_update_mode, tariff_metadata
@@ -25,15 +26,20 @@ async def async_get_config_entry_diagnostics(
     # Allowlist configuration diagnostics; do not export tokens, names or arbitrary user data.
     options = {key: value for key, value in options.items() if key in {
         "selected_supplier", "supplier_tariff_updates", "price_resolution", "energy_tax", "vat",
-        "enable_entsoe", "primary_provider",
+        "enable_entsoe", "primary_provider", "country", "currency",
     } and isinstance(value, (str, int, float, bool))}
-    supplier = _selected_supplier_profile(entry)
-    manager = getattr(coordinator, "registry_manager", None)
-    registry_info = registry_status(manager, supplier_update_mode({**entry.data, **entry.options}))
-    tariff_info = {"supplier_id": supplier.key, **tariff_metadata(supplier, dt_util.now()),
-                   **tariff_status(supplier, dt_util.now(), manager)}
-    tariff_info["supplier_tariff_source_url"] = tariff_info["source_url"]
-    registry_sections = {"supplier_registry": registry_info, "supplier_tariff": tariff_info}
+    supplier = None
+    registry_sections = pricing_metadata(entry)
+    if wholesale_only(entry):
+        options = {key: value for key, value in options.items() if key not in {"selected_supplier", "energy_tax", "vat", "supplier_tariff_updates"}}
+    else:
+        supplier = _selected_supplier_profile(entry)
+        manager = getattr(coordinator, "registry_manager", None)
+        registry_info = registry_status(manager, supplier_update_mode({**entry.data, **entry.options}))
+        tariff_info = {"supplier_id": supplier.key, **tariff_metadata(supplier, dt_util.now()),
+                       **tariff_status(supplier, dt_util.now(), manager)}
+        tariff_info["supplier_tariff_source_url"] = tariff_info["source_url"]
+        registry_sections.update(supplier_registry=registry_info, supplier_tariff=tariff_info)
     fetch = {key: value for key, value in coordinator.fetch_diagnostics.items()
              if key in {"today_fetch_status", "tomorrow_fetch_status", "cache_status", "tomorrow_prices_expected_later"}}
     fetch["provider_errors"] = {key: "error" for key in coordinator.fetch_diagnostics.get("provider_errors", {})
@@ -41,8 +47,8 @@ async def async_get_config_entry_diagnostics(
     if data is None:
         return {"loaded": False, "options": options, "cache_rollover_used": False, "cache_source_date": None,
                 **fetch, **registry_sections}
-    advisor = _v2_data("price_advisor", data, dt_util.now(), entry, hass.config.language)
-    price_score = _v2_data("price_score", data, dt_util.now(), entry)
+    advisor = {} if wholesale_only(entry) else _v2_data("price_advisor", data, dt_util.now(), entry, hass.config.language)
+    price_score = {} if wholesale_only(entry) else _v2_data("price_score", data, dt_util.now(), entry)
     return {
         "loaded": True,
         **fetch,
@@ -73,10 +79,10 @@ async def async_get_config_entry_diagnostics(
             "average_reference_price": price_score.get("average_reference_price"),
         },
         "selected_planning_options": {
-            "price_type": "all_in",
+            "price_type": "market" if wholesale_only(entry) else "all_in",
             "resolution": data.result.effective_price_resolution,
         },
-        "supplier_profile_version": supplier.profile_version,
+        "supplier_profile_version": supplier.profile_version if supplier else None,
         "dashboard_helper_status": bool(coordinator.runtime_options[CONF_CHART_HELPERS]),
         "resolution_status": {
             "requested": data.result.requested_price_resolution,

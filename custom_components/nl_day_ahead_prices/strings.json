@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "EnerPrice",
-        "description": "Set up Dutch day-ahead electricity prices.",
+        "description": "Choose Netherlands for contract pricing or Belgium for wholesale market prices only (EUR/kWh, excluding VAT, taxes, grid tariffs and supplier fees).",
         "data": {
           "name": "Name",
           "country": "Country / bidding zone",
@@ -13,13 +13,17 @@
           "entsoe_api_token": "ENTSO-E API token"
         }
       }
+    },
+    "error": {
+      "unsupported_market": "Choose NL or BE.",
+      "belgium_eur_only": "Belgian wholesale prices are available in EUR only."
     }
   },
   "options": {
     "step": {
       "init": {
         "title": "EnerPrice options",
-        "description": "Choose your provider, tax settings, and supplier profile. Custom supplier details are shown in the next step only when Custom supplier is selected.",
+        "description": "Netherlands: select your supplier and contract settings. Belgium: wholesale prices and consumption planning only; Dutch contract, tax and financial-advice settings are inactive there.",
         "data": {
           "country": "Country / bidding zone",
           "currency": "Currency",
@@ -101,6 +105,23 @@
           "smart_solar_surplus_threshold_w": "Minimum meaningful measured solar surplus in W before EnerPrice treats it as partial surplus.",
           "smart_advice_language": "Language used for Smart Energy Advisor recommendations."
         }
+      },
+      "belgian_market": {
+        "title": "Belgium: wholesale only",
+        "description": "EUR/kWh, excluding VAT, taxes, grid tariffs and supplier fees. Available: wholesale prices, price periods and consumption planning. Unavailable: Belgian all-in prices, injection revenue, battery returns and financial daily advice. Stored Dutch settings are preserved for switching back."
+      },
+      "powerpeers_contract": {
+        "title": "Powerpeers contract",
+        "description": "Enter the amounts from your own contract or dashboard. EUR 0.01/kWh is a published suggestion, not a universal contract rate. Monthly charges have no default. Check every VAT choice. These are interval estimates, not annual netting or monthly settlement. From 2027 the market component excludes VAT; through 2029 the published minimum formula applies before the selling fee.",
+        "data": {
+          "custom_monthly_fee_electricity": "Monthly electricity charge (including VAT, from your contract)",
+          "custom_purchase_fee_electricity": "Electricity purchase fee",
+          "custom_purchase_fee_includes_vat": "Purchase fee includes VAT",
+          "custom_sell_fee_electricity": "Electricity sell fee",
+          "custom_sell_fee_includes_vat": "Sell fee includes VAT",
+          "custom_sell_market_price_includes_vat": "Export market component before 2027 includes VAT (check contract)",
+          "powerpeers_contract_confirmed": "I checked these fees and VAT choices against my Powerpeers contract"
+        }
       }
     },
     "error": {
@@ -117,7 +138,10 @@
       "daily_invalid_retention": "Choose a whole number of days from 1 to 90.",
       "daily_invalid_time": "Choose a valid local time with seconds set to 00.",
       "daily_invalid_notify_target": "Choose an available Companion app or HA notification target.",
-      "daily_invalid_counter": "Choose a cumulative energy meter with state_class total_increasing."
+      "daily_invalid_counter": "Choose a cumulative energy meter with state_class total_increasing.",
+      "unsupported_market": "Choose NL or BE.",
+      "belgium_eur_only": "Belgian wholesale prices are available in EUR only.",
+      "invalid_powerpeers_contract": "Enter every contract amount and VAT choice, and confirm that you checked them."
     }
   },
   "selector": {
@@ -352,8 +376,14 @@
       "name": "Generate EnerPrice dashboard",
       "description": "Generate Lovelace YAML to paste manually into a dashboard.",
       "fields": {
-        "include_daily_advisor": {"name": "Show Daily Advisor", "description": "Optional consumption windows, solar forecasts and three-day outlook."},
-        "use_apexcharts": {"name": "Use ApexCharts", "description": "Disable for a dashboard using only built-in cards."},
+        "include_daily_advisor": {
+          "name": "Show Daily Advisor",
+          "description": "Optional consumption windows, solar forecasts and three-day outlook."
+        },
+        "use_apexcharts": {
+          "name": "Use ApexCharts",
+          "description": "Disable for a dashboard using only built-in cards."
+        },
         "dashboard_type": {
           "name": "Dashboard type",
           "description": "Choose a compact, full, or advisor dashboard."
@@ -421,11 +451,29 @@
   },
   "entity": {
     "sensor": {
-      "daily_energy_advice": {"name": "Daily Energy Advice", "state": {"ready": "Advice available", "unavailable": "Insufficient data"}},
-      "best_consumption_window": {"name": "Best Consumption Window"},
-      "solar_forecast_today": {"name":"Solar Forecast Today"},
-      "solar_forecast_tomorrow": {"name":"Solar Forecast Tomorrow"},
-      "daily_forecast_quality": {"name":"Forecast Data Quality","state":{"partial":"Partially available","unavailable":"Unavailable"}},
+      "daily_energy_advice": {
+        "name": "Daily Energy Advice",
+        "state": {
+          "ready": "Advice available",
+          "unavailable": "Insufficient data"
+        }
+      },
+      "best_consumption_window": {
+        "name": "Best Consumption Window"
+      },
+      "solar_forecast_today": {
+        "name": "Solar Forecast Today"
+      },
+      "solar_forecast_tomorrow": {
+        "name": "Solar Forecast Tomorrow"
+      },
+      "daily_forecast_quality": {
+        "name": "Forecast Data Quality",
+        "state": {
+          "partial": "Partially available",
+          "unavailable": "Unavailable"
+        }
+      },
       "supplier_tariff_status": {
         "name": "Supplier Tariff Status",
         "state": {

@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.7.0 - planned
+
+### Added
+- Customer-confirmed Powerpeers contract setup, quarter-hour auto resolution and dated export estimates (including 2027–2029 minimum).
+- Explicit Belgian wholesale-only mode across providers, price entities, consumption planning, dashboard generation and diagnostics.
+
+### Correctness
+- Reject unsupported Belgian contract-price/revenue advice and prevent reuse of a Dutch price cache after a market switch.
+- Reload price calculations after confirmed contract settings change; preserve customer tariffs in the isolated advisor worker.
+- Retain the v2.6.10 performance fixes. Belgian all-in supplier contracts, annual saldering and monthly settlement remain outside these interval estimates.
+
 ## 2.6.10 - 2026-11-24
 
 ### Fixed

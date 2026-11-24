@@ -1,7 +1,7 @@
 [project]
 name = "home-assistant-nl-day-ahead-prices"
-version = "2.6.10"
-description = "EnerPrice smart energy assistant for Dutch dynamic electricity tariffs"
+version = "2.7.0"
+description = "EnerPrice: Dutch contract pricing and Belgian wholesale electricity planning"
 requires-python = ">=3.12"
 
 [tool.pytest.ini_options]

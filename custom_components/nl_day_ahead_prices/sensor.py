@@ -83,7 +83,9 @@ from .const import (
     DOMAIN,
     PROVIDER_NAMES,
 )
+from .contract_pricing import POWERPEERS, powerpeers_profile
 from .coordinator import NLDayAheadPricesCoordinator
+from .market import BE_PRICE_KEYS, pricing_metadata, wholesale_only, wholesale_profile
 from .models import (
     PriceData,
     average_price,
@@ -192,11 +194,15 @@ def _entry_options(entry: ConfigEntry) -> dict[str, Any]:
 
 
 def _energy_tax(entry: ConfigEntry) -> float:
+    if wholesale_only(entry):
+        return 0.0
     options = _entry_options(entry)
     return float(options.get(CONF_ENERGY_TAX, options.get(CONF_ENERGY_TAX_INCL_VAT, DEFAULT_ENERGY_TAX)))
 
 
 def _vat(entry: ConfigEntry) -> float:
+    if wholesale_only(entry):
+        return 0.0
     return float(_entry_options(entry).get(CONF_VAT, DEFAULT_VAT))
 
 
@@ -205,7 +211,11 @@ def _selected_supplier_key(entry: ConfigEntry) -> str:
 
 
 def _selected_supplier_profile(entry: ConfigEntry) -> SupplierProfile:
+    if wholesale_only(entry):
+        return wholesale_profile()
     key = _selected_supplier_key(entry)
+    if key == POWERPEERS:
+        return powerpeers_profile(_entry_options(entry))
     if key == "custom":
         return _custom_supplier_profile(entry)
 
@@ -259,6 +269,8 @@ def _last_successful(data: PriceData, now: datetime, entry: ConfigEntry) -> date
 
 
 def _all_in_entries(data: PriceData, entry: ConfigEntry, prices: list | None = None) -> list:
+    if wholesale_only(entry):
+        return data.result.prices if prices is None else prices
     return all_in_entries_for_supplier(
         data.result.prices if prices is None else prices,
         _energy_tax(entry), _selected_supplier_profile(entry), _vat(entry),
@@ -755,9 +767,12 @@ async def async_setup_entry(
 ) -> None:
     """Set up sensors."""
     coordinator: NLDayAheadPricesCoordinator = hass.data[DOMAIN][entry.entry_id]
-    entities = [NLDayAheadPriceSensor(coordinator, entry, description) for description in SENSORS]
-    entities.extend(NLRegistryDiagnosticSensor(coordinator, entry, description) for description in REGISTRY_SENSORS)
-    if _entry_options(entry).get(CONF_SMART_SETUP_ENABLED, False):
+    be = wholesale_only(entry)
+    entities = [NLDayAheadPriceSensor(coordinator, entry, description) for description in SENSORS
+                if not be or description.key in BE_PRICE_KEYS]
+    if not be:
+        entities.extend(NLRegistryDiagnosticSensor(coordinator, entry, description) for description in REGISTRY_SENSORS)
+    if not be and _entry_options(entry).get(CONF_SMART_SETUP_ENABLED, False):
         entities.append(NLSmartEnergyAdvisorSensor(coordinator, entry))
     daily = getattr(coordinator, "daily_forecast", None)
     if daily is not None:
@@ -824,6 +839,8 @@ class NLSmartEnergyAdvisorSensor(CoordinatorEntity[NLDayAheadPricesCoordinator],
         return self._result
 
     def _advice(self) -> dict[str, Any]:
+        if wholesale_only(self.entry):
+            return {"state": "normal", "recommendation": "Belgium: wholesale-only; contract heat advice is unavailable."}
         data = self.coordinator.data
         if data is None:
             return {"state": "normal", "recommendation": "Price data is not available."}
@@ -930,6 +947,8 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
     @property
     def native_value(self) -> Any:
         """Return sensor value."""
+        if wholesale_only(self.entry) and self.entity_description.key not in BE_PRICE_KEYS:
+            return None
         if self.coordinator.data is None:
             return None
         if self.entity_description.analysis_key:
@@ -968,6 +987,26 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
         data = self.coordinator.data
         if data is None:
             return {}
+        if wholesale_only(self.entry):
+            attributes = _cached_value(self.coordinator, "wholesale_attributes", lambda: {
+                "prices": [item.as_attribute() for item in data.result.prices],
+                "prices_today": [item.as_attribute() for item in data.result.prices_today],
+                "prices_tomorrow": [item.as_attribute() for item in data.result.prices_tomorrow],
+                "raw_prices": [item.as_attribute() for item in data.result.raw_prices],
+                "raw_prices_today": [item.as_attribute() for item in data.result.source_prices_today],
+                "raw_prices_tomorrow": [item.as_attribute() for item in data.result.source_prices_tomorrow],
+                "price_resolution": data.result.effective_price_resolution,
+                "requested_price_resolution": data.result.requested_price_resolution,
+                "effective_price_resolution": data.result.effective_price_resolution,
+                "raw_price_resolution": data.result.raw_price_resolution,
+                "resolution_converted": data.result.resolution_converted,
+                "provider": data.result.provider,
+                "provider_name": PROVIDER_NAMES.get(data.result.provider, data.result.provider),
+                "fallback_used": data.fallback_used, "cache_used": data.from_cache,
+                "data_completeness": data.data_completeness,
+                "last_successful_update": data.last_successful_update.isoformat() if data.last_successful_update else None,
+            })
+            return {**attributes, **pricing_metadata(self.entry)}
         supplier_profile = _selected_supplier_profile(self.entry)
         all_in_entries = _cached_all_in_entries(self.coordinator, data, self.entry)
         today_count = len(data.result.prices_today)
@@ -990,6 +1029,7 @@ class NLDayAheadPriceSensor(CoordinatorEntity[NLDayAheadPricesCoordinator], Sens
             self.coordinator, "sell_price_attributes", lambda: [entry.as_attribute() for entry in sell_entries]
         )
         base = {
+            **pricing_metadata(self.entry),
             **shared_price_attributes,
             "all_in_prices_today": all_in_attributes[:today_count],
             "all_in_prices_tomorrow": all_in_attributes[today_count:],

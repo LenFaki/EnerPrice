@@ -1,5 +1,9 @@
 # EnerPrice dashboardvoorbeelden
 
+## Markt kiezen (v2.7)
+
+De all-in-, Prijsadviseur- en Smart/Dagelijks-voorbeelden hieronder gelden voor **NL**. Voor **BE** gebruik je `nl_day_ahead_prices.generate_dashboard_yaml`: de generator kiest echte marktprijsentiteiten en vermeldt dat btw en kosten ontbreken. Belgische all-in-, injectie- en batterijadvieskaarten zijn niet beschikbaar. Zie de [actuele handleiding](enerprice-v2-6-gebruikershandleiding.md) en [Belgische ondersteuning](belgium-support-plan.md).
+
 Deze voorbeelden zijn bedoeld als direct bruikbaar startpunt voor Home Assistant. Vervang de voorbeeld-entiteiten door de entity-ID's uit je eigen installatie. EnerPrice blijft adviserend: de voorbeelden sturen niet zelfstandig een apparaat aan, tenzij je daar bewust zelf een automatisering omheen bouwt.
 
 ## 1. Huidige all-in stroomprijs
@@ -30,9 +34,7 @@ Vanaf v2.5 kun je **Smart Setup** optioneel inschakelen via de EnerPrice-opties.
 
 Smart Setup is optioneel en staat voor bestaande installaties standaard uit. Bestaande v2.4.x-servicecalls blijven werken. Waarden die je expliciet in een servicecall meegeeft hebben altijd voorrang op de opgeslagen Smart Setup-instellingen.
 
-De Smart Energy Advisor is een response-actie.
-
-De Smart Energy Advisor is een response-actie. Een praktische inrichting gebruikt:
+De Smart Energy Advisor is een response-actie en, wanneer Smart Setup aanstaat, ook een blijvende sensor. Een praktische inrichting gebruikt:
 - een werkende EnerPrice-configuratie met actuele all-in prijzen;
 - optioneel een gasprijssensor in €/m³;
 - bij voorkeur een P1/netvermogenssensor in W;
