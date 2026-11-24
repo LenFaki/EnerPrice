@@ -14,6 +14,7 @@ from homeassistant.helpers.event import async_track_state_change_event, async_tr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
+from .advisor_gc import profile_advisor_gc
 from .const import (
     CONF_ADVICE_LANGUAGE,
     CONF_DAILY_CONSUMPTION_ENTITIES,
@@ -27,6 +28,7 @@ from .const import (
     CONF_FLEXIBLE_LOAD_POWER_W,
     DOMAIN,
 )
+from .daily_cache import advice_time_bucket
 from .solar_forecast import (
     AMSTERDAM,
     ENERGY_UNITS,
@@ -57,7 +59,19 @@ def advisor_context(coordinator):
     started = perf_counter()
     forecast = daily.snapshot()
     snapshot_ms = (perf_counter() - started) * 1000
-    exports = export_entries_for_supplier(data.result.prices, _selected_supplier_profile(coordinator.entry), _vat(coordinator.entry)) if data else []
+    # The export conversion can stall independently of advice generation.
+    # Profile it separately to distinguish process-wide GC pauses from work
+    # performed by the supplier tariff calculation.
+    with profile_advisor_gc("Daily Advisor export prices", _LOGGER):
+        exports = (
+            export_entries_for_supplier(
+                data.result.prices,
+                _selected_supplier_profile(coordinator.entry),
+                _vat(coordinator.entry),
+            )
+            if data
+            else []
+        )
     export_ms = (perf_counter() - started) * 1000 - snapshot_ms
     if snapshot_ms + export_ms >= 250:
         _LOGGER.warning(
@@ -71,8 +85,67 @@ def advisor_context(coordinator):
             "resolution_minutes": 15 if data and data.result.effective_price_resolution == "quarter_hour" else 60}
 
 
+def _daily_cache_miss_reasons(previous, current):
+    """Describe cache invalidation without logging options or sensor values."""
+    if previous is None:
+        return "initial"
+    names = ("prices", "forecast", "time_bucket", "options", "language")
+    changed = [name for name, before, after in zip(names, previous, current, strict=True)
+               if before != after]
+    return ",".join(changed) or "unknown"
+
+
+def _forecast_change_reasons(before, after):
+    """Safe, bounded field-level reasons; never expose values or entity IDs."""
+    if not isinstance(before, dict) or not isinstance(after, dict):
+        return "snapshot"
+    labels = []
+    for key, label in (
+        ("days", "days"),
+        ("series", "series"),
+        ("series_status", "series_status"),
+        ("quality", "quality"),
+        ("issues", "issues"),
+    ):
+        if before.get(key) != after.get(key):
+            labels.append(label)
+
+    # Separate measured values from bookkeeping timestamps and availability.
+    # This helps distinguish real sensor changes from refresh-only churn.
+    old_measurements = before.get("measurements", [])
+    new_measurements = after.get("measurements", [])
+    if old_measurements != new_measurements:
+        if not isinstance(old_measurements, list) or not isinstance(new_measurements, list):
+            labels.append("measurements")
+        elif len(old_measurements) != len(new_measurements):
+            labels.append("measurements_structure")
+        elif any(not isinstance(item, dict) for item in old_measurements + new_measurements):
+            labels.append("measurements")
+        else:
+            fields = (
+                ("measurements_value", ("value",)),
+                ("measurements_time", ("last_updated", "observed_at")),
+                ("measurements_status", ("kind", "status")),
+                ("measurements_metadata", ("entity_id", "role", "unit", "state_class")),
+            )
+            for label, keys in fields:
+                if any(tuple(old.get(key) for key in keys) != tuple(new.get(key) for key in keys)
+                       for old, new in zip(old_measurements, new_measurements, strict=True)):
+                    labels.append(label)
+            if not any(label.startswith("measurements_") for label in labels):
+                labels.append("measurements_other")
+
+    known = {"days", "series", "series_status", "quality", "issues", "measurements"}
+    if any(before.get(key) != after.get(key) for key in (before.keys() | after.keys()) - known):
+        labels.append("other")
+    return ",".join(labels) or "unknown"
+
+
 def daily_advice(coordinator, language=None):
     """One cached result shared by the new Daily Advisor entities."""
+    runtime = getattr(coordinator, "daily_advice_runtime", None)
+    if runtime is not None:
+        return runtime.get(language)
     from .sensor import _cached_all_in_entries
     from .smart_energy import build_smart_energy_advice
 
@@ -82,9 +155,21 @@ def daily_advice(coordinator, language=None):
         language = coordinator.hass.config.language
     now = dt_util.utcnow()
     prices = _cached_all_in_entries(coordinator, coordinator.data, coordinator.entry) if coordinator.data else []
-    signature = (id(prices), id(coordinator.daily_forecast.data), int(now.timestamp() // 60), repr(options), language)
+    # Compare forecast snapshots by value, not object identity: the forecast
+    # coordinator creates a fresh dict for routine state-change and clock
+    # notifications, even when the actual forecast/measurements are unchanged.
+    # Keep the complete snapshot in the signature so real changes (including
+    # measurements, freshness and series) still invalidate the advice.
+    signature = (id(prices), coordinator.daily_forecast.data, advice_time_bucket(now), repr(options), language)
     cache = getattr(coordinator, "analysis_cache", {})
-    if cache.get("daily_advice", (None,))[0] != signature:
+    previous = cache.get("daily_advice")
+    if previous is None or previous[0] != signature:
+        miss_reasons = _daily_cache_miss_reasons(previous[0] if previous else None, signature)
+        # Only enrich the existing slow-recomputation warning. The snapshot
+        # details are fixed category labels, never measurements or entity IDs.
+        if previous and previous[0][1] != signature[1]:
+            forecast_reasons = _forecast_change_reasons(previous[0][1], signature[1])
+            miss_reasons += f"; forecast detail: {forecast_reasons}"
         # Conversion is only needed on a cache miss. Home Assistant reads
         # state and attributes separately, often within the same minute.
         # Absolute timestamps avoid same-zone repeated-hour comparisons.
@@ -95,22 +180,31 @@ def daily_advice(coordinator, language=None):
         conversion_ms = (perf_counter() - started) * 1000
         context = advisor_context(coordinator)
         context_ms = (perf_counter() - started) * 1000 - conversion_ms
-        result = build_smart_energy_advice(
-            electricity_price=None, future_prices=utc_prices, now=now,
-            flexible_load_power_w=options.get(CONF_FLEXIBLE_LOAD_POWER_W), language=language,
-            daily_context=context,
-        )["daily_advisor"]
+        with profile_advisor_gc("Daily Advisor", _LOGGER):
+            result = build_smart_energy_advice(
+                electricity_price=None, future_prices=utc_prices, now=now,
+                flexible_load_power_w=options.get(CONF_FLEXIBLE_LOAD_POWER_W), language=language,
+                daily_context=context,
+            )["daily_advisor"]
         calculation_ms = (perf_counter() - started) * 1000 - conversion_ms - context_ms
         total_ms = (perf_counter() - started) * 1000
         if total_ms >= 250:
             _LOGGER.warning(
                 "EnerPrice Daily Advisor recomputation took %.1f ms "
                 "(UTC prices: %.1f ms, context: %.1f ms, advice: %.1f ms; "
-                "price entries: %d). Check for repeated warnings and report timings.",
-                total_ms, conversion_ms, context_ms, calculation_ms, len(prices),
+                "price entries: %d; cache miss: %s). Check for repeated warnings and report timings.",
+                total_ms, conversion_ms, context_ms, calculation_ms, len(prices), miss_reasons,
             )
         cache["daily_advice"] = (signature, result)
     return cache["daily_advice"][1]
+
+
+async def async_daily_advice(coordinator, language=None):
+    """Await the prepared plan for delivery/service callers."""
+    runtime = getattr(coordinator, "daily_advice_runtime", None)
+    if runtime is not None:
+        return await runtime.async_get(language)
+    return daily_advice(coordinator, language)
 
 
 def selected_entities(options):

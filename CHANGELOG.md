@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.6.10 - 2026-11-24
+
+### Fixed
+- Calculate Daily Advisor plans in a persistent isolated Python process instead of sensor properties or a shared-interpreter executor thread.
+- Bootstrap the worker from its absolute file path so it works with Home Assistant temporary custom-component import paths, including Python 3.14.
+- Coalesce recalculations, reject obsolete results, bound worker failures and stop workers on unload.
+- Preserve active per-date supplier tariffs in the worker and keep current measurements and forecast freshness checks.
+
+### Performance
+- Share daily plans, tariff conversions and expensive price-sensor attribute payloads.
+- Stream optimizer candidates when only one consumption window is requested.
+- Validate the complete suite on Python 3.12 and 3.14.
+
+### Field validation and limits
+- Promotes the beta.13 runtime tested in Home Assistant since 19 November; the recurring advisor stalls and worker startup errors have not returned in the reported follow-up.
+- Two isolated slow status/general-price sensor updates were reported and remain a separate follow-up; this release does not claim to eliminate Home Assistant-wide garbage collection pauses.
+- Existing entity IDs, settings and financial models are preserved. Powerpeers and Belgian-market functionality remain separate work.
+
 ## 2.6.7 - 2026-10-20
 
 ### Fixed

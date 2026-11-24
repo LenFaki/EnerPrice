@@ -184,9 +184,9 @@ def async_register_v2_services(hass: HomeAssistant) -> None:
         coordinator = _coordinator(hass, data.pop("config_entry_id", None))
         if coordinator is None or coordinator.data is None:
             if coordinator is not None and name == "get_smart_energy_advice" and getattr(coordinator, "daily_forecast", None) is not None:
-                from .daily_advisor import daily_advice
+                from .daily_advisor import async_daily_advice
 
-                return {"state": "normal", "daily_advisor": daily_advice(coordinator, data.get("language"))}
+                return {"state": "normal", "daily_advisor": await async_daily_advice(coordinator, data.get("language"))}
             return {"error": "Price data is not available"}
         if name == "get_smart_energy_advice":
             prices = _prices(coordinator, "all_in", True)
