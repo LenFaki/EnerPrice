@@ -6,9 +6,11 @@
 
 **Language:** English | [Nederlands](README.nl.md)
 
-**EnerPrice 2.6:** Daily Energy Advisor supports optional solar-aware scenarios,
-consent-gated morning briefings and conservative forecast-versus-actual checks.
-Potential savings are not verified realized savings.
+**EnerPrice 2.7:** Powerpeers contract setup and Belgian wholesale-price planning,
+built on the v2.6.10 advisor performance fixes. Optional Daily Energy Advisor
+remains available in NL mode. Potential savings are not verified realized savings.
+
+[Release notes](docs/releases/v2.7.0.md) · [User guide](docs/enerprice-v2-6-user-guide.md) · [Documentation index](docs/README.md)
 
 [![GitHub Release](https://img.shields.io/github/v/release/LenFaki/EnerPrice?style=flat-square)](https://github.com/LenFaki/EnerPrice/releases)
 [![Status](https://img.shields.io/badge/status-stable-green.svg?style=flat-square)](https://github.com/LenFaki/EnerPrice)
@@ -22,7 +24,7 @@ Potential savings are not verified realized savings.
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20EnerPrice-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white)](https://ko-fi.com/lenfaki)
 
 EnerPrice is a HACS-compatible Home Assistant custom integration for Dutch
-dynamic energy prices.
+dynamic electricity contracts and Belgian wholesale electricity prices.
 
 Previously known as **NL Day Ahead Prices**, EnerPrice provides day-ahead
 electricity prices, quarter-hour prices, supplier-specific all-in tariffs,
@@ -36,6 +38,15 @@ energieadvies voor Home Assistant.
 Select **Powerpeers** in options and confirm the fees and VAT choices from your own contract. Monthly charges have no default. See [Powerpeers setup and calculation rules](docs/powerpeers-tariff-review.md).
 
 Select **BE — wholesale only** for Belgian market prices and consumption planning in EUR/kWh, excluding VAT, taxes, grid tariffs and supplier fees. Belgian all-in prices, injection revenue and financial advice are unavailable. See [Belgian support](docs/belgium-support-plan.md).
+
+| Market | Available pricing and advice |
+| --- | --- |
+| NL | Wholesale prices, configured supplier all-in estimates, Smart/Daily advice |
+| BE | Wholesale prices and consumption-window planning; excludes VAT, taxes, grid tariffs and supplier fees |
+
+Belgian mode excludes supplier all-in prices, injection revenue, battery returns
+and financial Smart/Daily advice. The NL feature descriptions below apply only
+in NL mode unless explicitly marked otherwise.
 
 ## What EnerPrice adds (and what it doesn't)
 
@@ -89,13 +100,13 @@ It is inspired by the sensor and ApexCharts attribute shape of `hass-entso-e`, b
 
 The default bidding zone is `NL`, currency is `EUR`, and all sensor prices are exposed as `EUR/kWh`. Provider prices in `EUR/MWh` are converted automatically.
 
-## EnerPrice 2.6 — Daily Energy Advisor
+## Daily Energy Advisor (NL)
 
 The optional Daily Energy Advisor finds a cheapest fully priced period for a configured flexible load. Optional Forecast.Solar, P1 and solar-power inputs enable a **separate conditional solar scenario**, including the opportunity cost of foregone export. Opt-in morning briefings require explicit consent; optional cumulative energy counters support conservative forecast-versus-actual checks. No devices are switched automatically.
 
 **Start simple:** enable Daily Advisor, enter the appliance power and duration, and check the grid-only recommendation first. Add solar inputs, notifications and performance checks only when useful.
 
-See [dashboard screenshots](docs/enerprice-v2-6-user-guide.md#dashboard-examples) and the [step-by-step EnerPrice 2.6 guide (English)](docs/enerprice-v2-6-user-guide.md) or the [Nederlandse handleiding](docs/enerprice-v2-6-gebruikershandleiding.md) for configuration, interpretation and troubleshooting.
+See [dashboard screenshots](docs/enerprice-v2-6-user-guide.md#dashboard-examples) and the [step-by-step EnerPrice 2.7 guide (English)](docs/enerprice-v2-6-user-guide.md) or the [Nederlandse handleiding](docs/enerprice-v2-6-gebruikershandleiding.md) for configuration, interpretation and troubleshooting.
 
 ## EnerPrice v2.5 — Smart Setup and Smart Energy Advisor
 
@@ -302,7 +313,7 @@ promoted to today using their Europe/Amsterdam timestamps. Partial current-day
 cache data is accepted; stale days are rejected. Diagnostics report fetch
 statuses, provider errors, and cache rollover status.
 
-Nord Pool can publish Dutch day-ahead prices in 15-minute market time units.
+Nord Pool can publish Dutch and Belgian day-ahead prices in 15-minute market time units.
 This integration preserves those source intervals and exposes hourly or
 quarter-hour prices depending on the selected price interval option.
 
@@ -330,9 +341,14 @@ has not loaded the custom component yet. Restart Home Assistant and check
 
 ## Options
 
-The all-in price can be configured in the integration options. Choose one of
-the built-in Dutch dynamic supplier profiles, or select **Custom supplier** and
-enter your own values.
+First choose **NL** or **BE** in integration options. BE supports EUR wholesale
+prices only; Dutch tax and supplier settings are inactive and hidden on later
+BE options visits. Switching market reloads the entry and keeps the stored NL
+settings for switching back. A Dutch price cache is never reused for BE.
+
+For NL all-in estimates, choose a bundled supplier, **Powerpeers (own contract)**,
+or **Custom supplier**. Powerpeers opens a mandatory contract-confirmation step;
+it does not take fees from the automatic registry. See the [Powerpeers setup](docs/powerpeers-tariff-review.md).
 
 - `selected_supplier`: default `Zonneplan`
 - `supplier_tariff_updates`: **Automatic (recommended)** or **Bundled only**; default Automatic
@@ -385,8 +401,9 @@ supplier purchase fee.
 `Current Market Price` and `Next Market Price` are bare market prices.
 They do not include taxes, VAT, or supplier purchase fees.
 
-The day summary sensors are all-in prices using your configured tax and
-supplier settings:
+In **NL mode**, day summary sensors are all-in estimates using your configured
+tax and supplier settings. In **BE mode**, the same summaries use wholesale
+prices excluding VAT and charges:
 
 - `Average Price Today`
 - `Average Price Tomorrow`
@@ -401,7 +418,7 @@ current and next interval.
 Some suppliers settle electricity per hour, while others use quarter-hour
 prices. The integration can expose either format:
 
-- `auto`: choose the resolution from the selected supplier profile.
+- `auto`: choose the selected supplier resolution in NL; Powerpeers and BE use quarter-hour prices.
 - `hourly`: always expose hourly prices.
 - `quarter_hour`: always expose quarter-hour prices.
 
@@ -466,7 +483,8 @@ hard-coded inside Python. The compatibility profile exposes:
 
 Bundled profiles currently include Zonneplan, Tibber, ANWB Energie,
 EasyEnergy, Eneco, Vandebron, Vattenfall, Greenchoice, EnergyZero, SamSam,
-Pure Energie, and Custom supplier.
+Pure Energie, and Custom supplier. **Powerpeers** is separately selectable with
+customer-confirmed contract values; it is not a bundled universal tariff.
 
 Tariffs can change and may differ per contract. Always check your current
 supplier contract or tariff sheet. The bundled `last_verified` and `source_url`
@@ -493,6 +511,11 @@ If you want to include them anyway, convert them manually to an estimated
 custom purchase fee.
 
 ## Entities
+
+The full entity set below is for NL mode. BE exposes market-price summaries,
+trends, ratings, volatility and best/peak periods, with wholesale-only metadata.
+It omits supplier/all-in/export and financial advice entities. After switching
+country, regenerate dashboards that still reference unsupported entities.
 
 Sensors:
 
@@ -556,16 +579,25 @@ Home Assistant restart. Enabling chart helpers adds the calculated
 ### Services
 
 `nl_day_ahead_prices.export_chart_data` returns `{time, price}` data for market
-or all-in prices. It supports today/tomorrow selection, automatic/hourly/
-quarter-hour resolution, and optional best/peak period output.
+or all-in prices. NL defaults to all-in estimates; BE defaults to wholesale market
+prices and rejects explicit all-in requests. It supports today/tomorrow selection,
+automatic/hourly/quarter-hour resolution, and optional best/peak period output.
 
 `nl_day_ahead_prices.generate_apexcharts_config` returns a YAML string with
-market, all-in, cheapest-period, and peak-period series. Call response services
-from Developer Tools using the UI's response-data option.
+market, all-in, cheapest-period, and peak-period attribute series. For BE, prefer
+`generate_dashboard_yaml`: it returns built-in market-only cards with explicit
+cost exclusions. Contract-based Smart/Daily, export and battery-return services
+are unavailable in BE. See [the complete BE scope](docs/belgium-support-plan.md).
+Call response services from Developer Tools using the UI's response-data option.
 
 ## Attributes
 
-Each price sensor exposes ApexCharts-friendly attributes:
+The full list below applies to NL. BE exposes only market-price arrays and
+provider/resolution metadata, with `market_country: BE`,
+`pricing_mode: wholesale_only`, `price_basis: wholesale_ex_vat` and
+`taxes_and_supplier_fees_included: false`; no synthetic all-in/export arrays.
+
+NL price sensors expose these ApexCharts-friendly attributes:
 
 - `prices`
 - `prices_today`

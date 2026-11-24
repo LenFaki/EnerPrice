@@ -1,8 +1,22 @@
-# EnerPrice 2.6 — What's new and how to use it
+# EnerPrice 2.7 — User guide
 
 **Language:** English | [Nederlands](enerprice-v2-6-gebruikershandleiding.md)
 
-EnerPrice 2.6 introduces the optional **Daily Energy Advisor**. Existing prices, entities and automations continue to work. EnerPrice provides advice; it **does not automatically switch devices**.
+EnerPrice 2.7 supports Dutch contract pricing and Belgian wholesale-price planning. The optional **Daily Energy Advisor** is available in NL mode. EnerPrice provides advice; it **does not automatically switch devices**.
+
+## Choose your market first
+
+Open **Settings → Devices & services → EnerPrice → Configure**.
+
+- **NL:** choose your supplier and check energy tax and VAT. All-in prices and financial advice are estimates based on those settings.
+- **Powerpeers (NL):** enter monthly charges including VAT, import/selling fees and VAT choices. Check the suggested EUR 0.01/kWh against your own contract and confirm the settings. Monthly charges have no default. See [tariff rules and limits](powerpeers-tariff-review.md).
+- **BE:** choose EUR and your price provider. Wholesale prices, trends, best/peak periods and consumption planning exclude VAT, taxes, grid tariffs and supplier fees. Belgian all-in prices, injection revenue and financial Smart/Daily advice are unavailable. See [Belgian support](belgium-support-plan.md).
+
+For BE, use `generate_dashboard_yaml` to generate a market-price dashboard using actual entity IDs. Consumption planning and chart export default to market prices; explicit all-in requests are rejected. Changing market preserves stored NL settings but disables them in BE and never reuses a Dutch price cache.
+
+Powerpeers auto resolution selects quarter-hour prices and export estimates follow local interval dates, including the 2027 rule change. Annual netting and the monthly floor are not reproduced as a bill.
+
+The following daily financial and solar-advice instructions apply to **NL mode**.
 
 ## Get started in five steps
 
@@ -31,7 +45,7 @@ Select the following inputs in EnerPrice options:
 - **Current solar production:** a sensor in **W**. If you have several inverters, combine their power readings with a Home Assistant template sensor.
 - **Flexible appliance:** its nominal power in **W** and required runtime.
 
-EnerPrice estimates current household baseline load as **solar power + grid power**. Both readings must be recent and sufficiently synchronized. The planned 2.6.2 improvement accepts readings up to **five minutes apart**, provided **both readings are no more than five minutes old**. Older measurements are never silently treated as live readings.
+EnerPrice estimates current household baseline load as **solar power + grid power**. Both readings must be recent and sufficiently synchronized. A validated synchronization window accepts readings up to **five minutes apart**, provided **both readings are no more than five minutes old**. Older measurements are never silently treated as live readings.
 
 A financially meaningful solar scenario also needs usable **export prices** for the relevant intervals. When required data is missing, the normal grid-only recommendation remains available and the solar diagnostics explain what is missing.
 
@@ -66,7 +80,7 @@ Optional energy performance tracking requires **cumulative** import and export e
 
 ## Dashboard examples
 
-These screenshots show six tabs of a real Home Assistant Sections dashboard, captured on 26 October 2026. Sensor names, tariffs, settings, and values vary by installation. EnerPrice does not automatically install this custom dashboard.
+These NL examples include features unavailable in BE mode. These screenshots show six tabs of a real Home Assistant Sections dashboard, captured on 26 October 2026. Sensor names, tariffs, settings, and values vary by installation. EnerPrice does not automatically install this custom dashboard.
 
 ### Overview: electricity prices and advice
 
@@ -107,3 +121,9 @@ Generate dashboard YAML with `nl_day_ahead_prices.generate_dashboard_yaml` and `
 - Foregone export revenue is considered in the separate solar scenario, not in the existing heat-source advice.
 - Entity names can differ between Home Assistant installations.
 - Check entity states and diagnostics before using recommendations in your own automations.
+
+## Upgrading and troubleshooting
+
+Update through HACS and restart Home Assistant. Since v2.6.10 a separate, reused Python process calculates daily advice; v2.7 retains that performance fix. Changed contract values reload price calculations.
+
+Allow the first calculation to finish after startup. For recurring problems, report the installed version, entity, timestamp and full error on GitHub. One isolated slow sensor update does not establish an advisor-calculation fault. Missing tomorrow prices can mean the auction has not published them yet.

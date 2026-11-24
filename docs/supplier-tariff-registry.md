@@ -4,6 +4,14 @@ The bundled `supplier_tariffs.json` is an offline registry, not a live tariff
 service. Schema version 1 contains `country: NL`, `currency: EUR` and a supplier
 map using the existing IDs. Each supplier has a name and a list of tariff records.
 
+## Market and contract scope (v2.7)
+
+This registry is for **NL** contracts. Belgian wholesale-only mode does not use
+its Dutch taxes/fees and does not subscribe to automatic supplier updates.
+**Powerpeers** is selected separately through a customer-confirmed contract;
+its manual fees are never replaced by this registry. Its date-dependent export
+minimum and settlement limits are documented in the [Powerpeers guide](powerpeers-tariff-review.md).
+
 ## Selection and fallback
 
 Dates use Europe/Amsterdam. `valid_from` and `valid_until` are inclusive ISO dates;

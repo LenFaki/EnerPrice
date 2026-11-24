@@ -1,5 +1,7 @@
 # Prepared Daily Advisor updates (v2.6.10-beta.11)
 
+> Historical engineering record. Version/status statements below describe that development stage. For current v2.7 setup, see the [user guide](enerprice-v2-6-user-guide.md) or [Nederlandse handleiding](enerprice-v2-6-gebruikershandleiding.md). The isolated runtime was released in [v2.6.10](releases/v2.6.10.md) and is retained in v2.7; financial Daily Advisor remains NL-only.
+
 ## Problem and change
 
 Beta.10 field measurements showed 2–3 second Daily Advisor updates. Almost all

@@ -1,5 +1,7 @@
 # Daily Energy Advisor PR2
 
+> Historical engineering record. Version/status statements below describe that development stage. For current v2.7 setup, see the [user guide](enerprice-v2-6-user-guide.md) or [Nederlandse handleiding](enerprice-v2-6-gebruikershandleiding.md). The isolated runtime was released in [v2.6.10](releases/v2.6.10.md) and is retained in v2.7; financial Daily Advisor remains NL-only.
+
 This document describes PR2. See [PR3](daily-advisor-pr3.md) for consent-gated
 notifications and conservative historical energy checks; its scope supersedes
 the PR2 exclusions below.

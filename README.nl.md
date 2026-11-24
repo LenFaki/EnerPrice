@@ -6,12 +6,14 @@
 
 **Taal:** [English](README.md) | Nederlands
 
-**EnerPrice 2.6:** de Dagelijkse Energieadviseur ondersteunt optioneel zonneadvies,
-ochtendmeldingen met expliciete toestemming en conservatieve energiecontrole.
-Potentieel voordeel is geen bewezen gerealiseerde besparing.
+**EnerPrice 2.7:** Powerpeers-contractinstellingen en Belgische marktprijsplanning,
+met de prestatieoplossing uit v2.6.10. De optionele Dagelijkse Energieadviseur
+blijft beschikbaar in NL-modus. Potentieel voordeel is geen bewezen besparing.
+
+[Releasenotities](docs/releases/v2.7.0.md) · [Handleiding](docs/enerprice-v2-6-gebruikershandleiding.md) · [Documentatieoverzicht](docs/README.md)
 
 EnerPrice is een HACS-compatibele custom integratie voor Home Assistant voor
-Nederlandse dynamische energieprijzen. De integratie heette eerder **NL Day
+Nederlandse dynamische stroomcontracten en Belgische marktprijzen. De integratie heette eerder **NL Day
 Ahead Prices**. De GitHub-repository heet nu `LenFaki/EnerPrice`. Het interne Home Assistant-domein
 `nl_day_ahead_prices` blijft ongewijzigd voor achterwaartse compatibiliteit.
 
@@ -25,6 +27,15 @@ worden als `EUR/kWh` aangeboden.
 Kies **Powerpeers** in de opties en bevestig de bedragen en btw-keuzes uit je eigen contract. Maandkosten hebben geen standaardwaarde. Zie [Powerpeers instellen en rekenregels](docs/powerpeers-tariff-review.md).
 
 Kies **BE — alleen marktprijzen** voor Belgische marktprijzen en verbruiksplanning in EUR/kWh, exclusief btw, belastingen, nettarieven en leverancierskosten. Belgische all-inprijzen, injectievergoeding en financieel advies zijn niet beschikbaar. Zie [Belgische ondersteuning](docs/belgium-support-plan.md).
+
+| Markt | Beschikbare prijzen en adviezen |
+| --- | --- |
+| NL | Marktprijzen, all-inramingen met ingestelde leverancier en Smart/Dagelijks advies |
+| BE | Marktprijzen en verbruiksplanning, exclusief btw, belastingen, nettarieven en leverancierskosten |
+
+Belgische modus bevat geen all-incontractprijzen, injectieopbrengst,
+batterijrendement of financieel Smart/Dagelijks advies. De beschrijvingen van
+deze Nederlandse functies hieronder gelden alleen voor NL-modus.
 
 ## Wat voegt EnerPrice toe (en wat niet)?
 
@@ -65,7 +76,7 @@ problemen via [GitHub Issues](https://github.com/LenFaki/EnerPrice/issues).
 
 Feedback, bugmeldingen en bijdragen zijn welkom.
 
-## Nieuw in EnerPrice 2.6 — Dagelijkse Energieadviseur
+## Dagelijkse Energieadviseur (NL)
 
 De optionele **Dagelijkse Energieadviseur** zoekt het voordeligste moment voor een flexibel apparaat op basis van gepubliceerde stroomprijzen. Met Forecast.Solar, P1 en zonneproductie kan EnerPrice daarnaast een **afzonderlijk voorwaardelijk zonnescenario** berekenen. Je kunt optioneel een dagelijkse melding instellen met expliciete toestemming en voorspellingen vergelijken met betrouwbare cumulatieve energiemetingen. EnerPrice schakelt zelf geen apparaten.
 
@@ -73,7 +84,7 @@ De optionele **Dagelijkse Energieadviseur** zoekt het voordeligste moment voor e
 
 Bekijk ook de [dashboardvoorbeelden](docs/enerprice-v2-6-gebruikershandleiding.md#dashboardvoorbeelden).
 
-**[Lees de volledige Nederlandstalige handleiding voor EnerPrice 2.6](docs/enerprice-v2-6-gebruikershandleiding.md)** of de [English user guide](docs/enerprice-v2-6-user-guide.md).
+**[Lees de volledige Nederlandstalige handleiding voor EnerPrice 2.7](docs/enerprice-v2-6-gebruikershandleiding.md)** of de [English user guide](docs/enerprice-v2-6-user-guide.md).
 
 ## EnerPrice v2.5 — Smart Setup en Smart Energy Advisor
 
@@ -238,8 +249,16 @@ worden gebruikt als providers tijdelijk niet beschikbaar zijn.
 
 ## Leverancier en all-in prijs
 
-In de opties kies je een ingebouwd Nederlands dynamisch leveranciersprofiel of
-**Eigen leverancier**. Belangrijke opties zijn:
+Kies eerst **NL** of **BE**. BE gebruikt uitsluitend marktprijzen in EUR;
+Nederlandse belastingen en leveranciersinstellingen zijn daar niet actief en
+worden bij volgende BE-optiebezoeken verborgen. Een landwissel herlaadt de
+integratie. Nederlandse instellingen blijven bewaard voor terugschakelen; een
+Nederlandse prijscache wordt niet als Belgische data gebruikt.
+
+In **NL-modus** kies je een ingebouwd leveranciersprofiel, **Powerpeers (eigen
+contract)** of **Eigen leverancier**. Powerpeers heeft een verplichte stap voor
+contractbedragen en btw-bevestiging en gebruikt geen automatische registertarieven.
+Zie [Powerpeers instellen](docs/powerpeers-tariff-review.md). Belangrijke NL-opties zijn:
 
 - `selected_supplier`;
 - `supplier_tariff_updates`: Automatisch of Alleen meegeleverd;
@@ -280,7 +299,7 @@ daarom je actuele contract of tariefblad wanneer nauwkeurigheid belangrijk is.
 
 EnerPrice ondersteunt:
 
-- `auto`: interval volgt het leveranciersprofiel;
+- `auto`: volgt het NL-leveranciersprofiel; Powerpeers en BE gebruiken kwartieren;
 - `hourly`: altijd uurwaarden;
 - `quarter_hour`: altijd kwartierwaarden.
 
@@ -291,6 +310,12 @@ dezelfde bronprijs. De originele bronprijzen blijven beschikbaar via
 `raw_price_resolution`.
 
 ## Belangrijkste entiteiten
+
+De volledige set hieronder geldt voor NL. BE biedt marktprijzen, dagoverzichten,
+trends, beoordelingen, volatiliteit en beste/piekperiodes. Die dagoverzichten
+zijn marktprijzen exclusief btw en kosten. All-in-, leverancier-, teruglever-
+en financiële adviesentiteiten ontbreken. Genereer na een landwissel het
+dashboard opnieuw als oude kaarten nog naar die entiteiten verwijzen.
 
 EnerPrice levert onder andere huidige en volgende marktprijs, huidige
 terugleverprijs (marktprijs min de terugleverkosten van de leverancier),
@@ -320,9 +345,11 @@ herstarten.
 ## Grafieken
 
 `nl_day_ahead_prices.export_chart_data` levert `{time, price}`-gegevens voor
-markt- of all-in prijzen. `generate_apexcharts_config` maakt een
-ApexCharts-configuratie met marktprijs, all-in prijs en optioneel beste- en
-piekperiodes.
+markt- of all-inprijzen. Zonder expliciet `price_type` gebruikt NL all-inprijzen
+en BE marktprijzen; een all-inverzoek in BE wordt geweigerd.
+`generate_apexcharts_config` maakt voorbeeldseries voor markt-, all-in- en
+prijsperiode-attributen. Gebruik voor BE bij voorkeur `generate_dashboard_yaml`: dat
+levert een marktprijsdashboard met zichtbare kostenuitsluitingen en ingebouwde kaarten.
 
 Prijsitems gebruiken dit formaat:
 
@@ -391,6 +418,10 @@ Runtime-instellingen voor analyse en periodeberekeningen zijn via de apparaatpag
 
 ## Services
 
+In BE zijn grafiekexport, marktgebaseerde verbruiksvensters en het marktprijsdashboard
+beschikbaar. Teruglever-, batterij- en financieel Smart/Dagelijks advies zijn daar
+niet beschikbaar. Zie [de volledige BE-scope](docs/belgium-support-plan.md).
+
 Naast de Smart Energy Advisor zijn de belangrijkste response-services:
 
 - `nl_day_ahead_prices.export_chart_data` — prijsdata exporteren voor grafieken;
@@ -407,6 +438,11 @@ Naast de Smart Energy Advisor zijn de belangrijkste response-services:
 Wanneer meerdere EnerPrice-configuraties geladen zijn, kan de Smart Energy Advisor via `config_entry_id` expliciet aan de gewenste configuratie worden gekoppeld.
 
 ## Attributen
+
+De uitgebreide lijst hieronder geldt voor NL. BE bevat alleen marktprijsarrays
+en bron-/resolutiemetadata, met `market_country: BE`, `pricing_mode: wholesale_only`,
+`price_basis: wholesale_ex_vat` en `taxes_and_supplier_fees_included: false`.
+Synthetische all-in- of terugleverarrays worden daar niet aangeboden.
 
 Prijsentiteiten bieden onder andere `prices`, `prices_today`, `prices_tomorrow`, `all_in_prices`, `all_in_prices_today`, `all_in_prices_tomorrow`, `sell_prices_today`, `sell_prices_tomorrow`, de overeenkomstige `raw_*` attributen, prijsresolutie, provider, fallbackstatus, cache-informatie, datacompleetheid, huidig/volgend interval, markt- en all-in prijs, beoordeling, trend, volatiliteit, dagstatistieken en leverancierstariefmetadata.
 

@@ -1,5 +1,7 @@
 # Daily Energy Advisor: PR1 development preview
 
+> Historical engineering record. Version/status statements below describe that development stage. For current v2.7 setup, see the [user guide](enerprice-v2-6-user-guide.md) or [Nederlandse handleiding](enerprice-v2-6-gebruikershandleiding.md). The isolated runtime was released in [v2.6.10](releases/v2.6.10.md) and is retained in v2.7; financial Daily Advisor remains NL-only.
+
 This page records the PR1 foundation. For the current advice and dashboard
 extension, see [Daily Advisor PR2](daily-advisor-pr2.md). PR1 contracts remain
 available; notifications and savings verification still belong to PR3.
