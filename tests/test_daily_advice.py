@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from custom_components.nl_day_ahead_prices.calculations import export_entries_for_supplier
+from custom_components.nl_day_ahead_prices.daily_cache import advice_time_bucket
 from custom_components.nl_day_ahead_prices.dashboard import generate_dashboard_yaml
 from custom_components.nl_day_ahead_prices.models import PriceEntry
 from custom_components.nl_day_ahead_prices.smart_energy import (
@@ -49,6 +50,45 @@ def daily(prices, ctx=None, *, now=NOW, power=1000, language="en"):
     return build_smart_energy_advice(electricity_price=None, future_prices=prices, now=now,
                                     flexible_load_power_w=power, language=language,
                                     daily_context=ctx if ctx is not None else context(prices, now=now))["daily_advisor"]
+
+
+def test_future_advice_chooses_earliest_qualifying_interval_from_unsorted_prices():
+    """One-pass selection must preserve the old chronological choice."""
+    now = NOW.astimezone(timezone.utc)
+    entries = [
+        PriceEntry(now + timedelta(hours=4), .10),
+        PriceEntry(now - timedelta(hours=1), .01),
+        PriceEntry(now + timedelta(hours=2), .19),
+        PriceEntry(now + timedelta(hours=1), .30),
+        PriceEntry(now + timedelta(hours=3), .18),
+    ]
+    result = build_smart_energy_advice(
+        electricity_price=.25, future_prices=entries, now=now,
+    )
+    assert result["next_better_time"] == now + timedelta(hours=2)
+    assert result["next_better_price"] == .19
+    assert result["minutes_until_better"] == 120
+
+
+def test_future_advice_returns_no_window_when_no_price_qualifies():
+    now = NOW.astimezone(timezone.utc)
+    result = build_smart_energy_advice(
+        electricity_price=.25,
+        future_prices=[PriceEntry(now + timedelta(hours=1), .24)],
+        now=now,
+    )
+    assert result["next_better_time"] is None
+    assert result["minutes_until_better"] is None
+
+
+def test_daily_known_interval_count_and_partial_status_are_preserved():
+    prices = prices_for_day()
+    prices.pop(4)
+    result = daily(prices, context(prices))
+    today = result["days"][0]
+    assert today["price_status"] == "partial"
+    assert today["known_intervals"] == 23
+    assert today["expected_intervals"] == 24
 
 
 def test_legacy_advice_unchanged_without_daily_context():
@@ -396,6 +436,77 @@ async def test_no_market_prices_keep_daily_outlook_available(advice_runtime):
     assert await handler(SimpleNamespace(service="get_smart_energy_advice", data={})) == {"error": "Price data is not available"}
 
 
+def test_daily_cache_miss_reasons_are_bounded_and_exclude_values(advice_runtime):
+    module = advice_runtime.adapter.module
+    reasons = module._daily_cache_miss_reasons
+    before = (1, 2, 3, "secret-option-value", "nl")
+    assert reasons(None, before) == "initial"
+    assert reasons(before, before) == "unknown"
+    assert reasons(before, (1, 4, 5, "different-secret", "en")) == (
+        "forecast,time_bucket,options,language"
+    )
+    assert "secret" not in reasons(before, (1, 4, 5, "different-secret", "en"))
+
+
+def test_forecast_change_reasons_are_bounded_and_hide_values(advice_runtime):
+    reasons = advice_runtime.adapter.module._forecast_change_reasons
+    before = {
+        "days": [{"date": "2026-11-03", "energy_kwh": 4}],
+        "series": [{"points": [1]}],
+        "quality": "available",
+        "issues": [],
+        "measurements": [{"entity_id": "sensor.private_name", "role": "grid_power",
+                          "value": 12, "last_updated": "private-timestamp",
+                          "observed_at": "private-observation", "status": "available"}],
+    }
+    after = {
+        **before,
+        "days": [{"date": "2026-11-03", "energy_kwh": 5}],
+        "measurements": [{**before["measurements"][0], "value": 13,
+                          "last_updated": "another-private-timestamp",
+                          "status": "unavailable"}],
+    }
+    assert reasons(before, before) == "unknown"
+    assert reasons(before, after) == (
+        "days,measurements_value,measurements_time,measurements_status"
+    )
+    assert "private" not in reasons(before, after)
+    assert reasons(before, {**before, "measurements": [*before["measurements"], {}]}) == (
+        "measurements_structure"
+    )
+    assert reasons(before, {**before, "series": [{"points": [2]}]}) == "series"
+    assert reasons(before, {**before, "extra": "secret"}) == "other"
+    assert reasons(None, after) == "snapshot"
+
+
+def test_forecast_change_reasons_detect_timestamp_only_updates(advice_runtime):
+    reasons = advice_runtime.adapter.module._forecast_change_reasons
+    before = {"measurements": [{"role": "solar_power", "value": 10,
+                                "last_updated": "2026-11-03T08:00:00Z"}]}
+    after = {"measurements": [{"role": "solar_power", "value": 10,
+                               "last_updated": "2026-11-03T08:01:00Z"}]}
+    assert reasons(before, after) == "measurements_time"
+
+
+def test_slow_forecast_cache_miss_reports_safe_details(advice_runtime, monkeypatch):
+    module = advice_runtime.adapter.module
+    coordinator = advice_runtime.coordinator
+    first = module.daily_advice(coordinator)
+    coordinator.daily_forecast.data = {
+        **coordinator.daily_forecast.data,
+        "quality": "private-forecast-value",
+    }
+    ticks = iter([0.0, .001, .002, .3, .31])
+    monkeypatch.setattr(module, "perf_counter", lambda: next(ticks))
+    monkeypatch.setattr(module, "advisor_context", lambda *_: {})
+    warning = Mock()
+    monkeypatch.setattr(module._LOGGER, "warning", warning)
+    assert module.daily_advice(coordinator) is not first
+    assert warning.call_count == 1
+    assert warning.call_args.args[-1] == "forecast; forecast detail: quality"
+    assert "private" not in str(warning.call_args)
+
+
 def test_shared_daily_result_cache_invalidates_on_options_and_forecast(advice_runtime):
     runtime = advice_runtime
     calculate = runtime.adapter.module.daily_advice
@@ -405,9 +516,54 @@ def test_shared_daily_result_cache_invalidates_on_options_and_forecast(advice_ru
     second = calculate(runtime.coordinator)
     assert second is not first
     assert second["best_window"]["duration_minutes"] == 120
+    # A routine coordinator tick creates a fresh snapshot even when its
+    # contents are identical; that must not recompute the expensive advice.
     runtime.coordinator.daily_forecast.data = dict(runtime.coordinator.daily_forecast.data)
+    assert calculate(runtime.coordinator) is second
+    # A real forecast quality change must still invalidate the cache.
+    runtime.coordinator.daily_forecast.data = {
+        **runtime.coordinator.daily_forecast.data,
+        "quality": "changed-forecast-quality",
+    }
     assert calculate(runtime.coordinator) is not second
     assert set(runtime.coordinator.analysis_cache) == {"daily_advice"}
+
+
+def test_daily_advice_cache_invalidates_on_measurements_and_series(advice_runtime):
+    from copy import deepcopy
+
+    runtime = advice_runtime
+    calculate = runtime.adapter.module.daily_advice
+    first = calculate(runtime.coordinator)
+    original = runtime.coordinator.daily_forecast.data
+    same = deepcopy(original)
+    runtime.coordinator.daily_forecast.data = same
+    assert calculate(runtime.coordinator) is first
+
+    # Measurements may affect solar/grid-aware advice. A changed reading must
+    # invalidate even when the snapshot's other fields stay the same.
+    updated = deepcopy(same)
+    updated["measurements"] = [*updated.get("measurements", []),
+                               {"role": "grid_power", "value": 123, "unit": "W"}]
+    runtime.coordinator.daily_forecast.data = updated
+    second = calculate(runtime.coordinator)
+    assert second is not first
+
+    # Forecast.Solar series changes must also invalidate the cached advice.
+    changed_series = deepcopy(updated)
+    changed_series["series"] = [*changed_series.get("series", []),
+                                {"time": "2026-10-29T12:00:00+00:00", "power_w": 300}]
+    runtime.coordinator.daily_forecast.data = changed_series
+    assert calculate(runtime.coordinator) is not second
+
+
+def test_daily_advice_cache_invalidates_on_time_bucket(advice_runtime, monkeypatch):
+    runtime = advice_runtime
+    module = runtime.adapter.module
+    monkeypatch.setattr(module, "advice_time_bucket", lambda _: 1)
+    first = module.daily_advice(runtime.coordinator)
+    monkeypatch.setattr(module, "advice_time_bucket", lambda _: 2)
+    assert module.daily_advice(runtime.coordinator) is not first
 
 
 async def test_dashboard_service_resolves_daily_ids_and_flags(advice_runtime):
@@ -493,6 +649,8 @@ def test_daily_advice_profiling_warns_only_on_slow_cache_misses(advice_runtime, 
         assert warning.call_count == 1
         assert "recomputation took" in warning.call_args.args[0]
         assert warning.call_args.args[1] == pytest.approx(elapsed * 1000)
+        assert "cache miss: %s" in warning.call_args.args[0]
+        assert warning.call_args.args[-1] == "initial"
 
 
 @pytest.mark.parametrize("snapshot_seconds,export_seconds,expected_warning", [
@@ -519,6 +677,28 @@ def test_daily_advisor_context_profiles_snapshot_and_export(advice_runtime, monk
         assert args[1] == pytest.approx((snapshot_seconds + export_seconds) * 1000)
         assert args[2] == pytest.approx(snapshot_seconds * 1000)
         assert args[3] == pytest.approx(export_seconds * 1000)
+
+
+def test_daily_context_profiles_export_conversion(advice_runtime, monkeypatch):
+    """Export conversion must be inside the GC profiling scope."""
+    from contextlib import contextmanager
+
+    module = advice_runtime.adapter.module
+    coordinator = advice_runtime.coordinator
+    entered = []
+
+    @contextmanager
+    def fake_profile(label, logger):
+        entered.append(label)
+        try:
+            yield
+        finally:
+            entered.append("done")
+
+    monkeypatch.setattr(module, "profile_advisor_gc", fake_profile)
+    result = module.advisor_context(coordinator)
+    assert result["export_prices"]
+    assert entered == ["Daily Advisor export prices", "done"]
 
 
 def test_daily_solar_interpolation_reuses_forecast_boundaries(monkeypatch):
@@ -554,3 +734,9 @@ def test_solar_integral_cached_and_uncached_are_identical():
             series, 0, 3600, baseline, power, power_at=cached
         )
     assert _solar_load_energy(series, 3600, 4500, 500, 1000, power_at=cached) is None
+
+
+def test_daily_advice_time_bucket_limits_recomputation_to_five_minutes():
+    start = datetime(2026, 10, 25, 13, 0, tzinfo=timezone.utc)
+    assert advice_time_bucket(start) == advice_time_bucket(start + timedelta(minutes=4, seconds=59))
+    assert advice_time_bucket(start) != advice_time_bucket(start + timedelta(minutes=5))

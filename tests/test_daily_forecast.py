@@ -358,6 +358,7 @@ async def test_entry_setup_nonblocking_and_optional_unload(adapter, monkeypatch,
     monkeypatch.setitem(sys.modules, const.__name__, const)
     monkeypatch.setattr(adapter.module.DailyForecastCoordinator, "async_refresh", AsyncMock(), raising=False)
     hass, entry = adapter.hass, adapter.entry
+    price.hass, price.entry = hass, entry
     entry.options[CONF_DAILY_ADVISOR_ENABLED] = enabled
     entry.async_on_unload = Mock()
     entry.add_update_listener = Mock()
