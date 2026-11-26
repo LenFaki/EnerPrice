@@ -60,7 +60,9 @@ def runtime(monkeypatch, tmp_path):
     spec.loader.exec_module(module)
     adapter.hass.config = SimpleNamespace(time_zone="Europe/Amsterdam", language="nl", path=lambda *parts: str(tmp_path.joinpath(*parts)))
     adapter.hass.is_stopping = False
-    adapter.hass.services.async_services = lambda: {"notify": {"mobile_app_phone": {}, "persistent_notification": {}, "smtp_mail": {}, "notify": {}}}
+    registered_services = {"notify": {"mobile_app_phone": {}, "persistent_notification": {}, "smtp_mail": {}, "notify": {}}}
+    adapter.hass.services.async_services = lambda: registered_services
+    adapter.hass.services.has_service.side_effect = lambda domain, name: name in registered_services.get(domain, {})
     adapter.hass.services.async_call = AsyncMock()
     adapter.entry.options = {CONF_DAILY_ADVISOR_ENABLED: True, CONF_DAILY_NOTIFY_ENABLED: True, CONF_DAILY_NOTIFY_CONSENT: True,
                              CONF_DAILY_NOTIFY_TARGET: TARGET, DAILY_CONSENT_TARGET: TARGET, CONF_DAILY_NOTIFY_TIME: "08:00:00"}
@@ -370,7 +372,7 @@ def test_actual_counter_adapter_uses_reports_but_power_and_forecasts_do_not(runt
     assert next(row for row in forecast.snapshot()["measurements"] if row["role"] == "import_energy")["value"] is None
 
 
-def test_new_entities_stable_ids_and_latest_summary_only(runtime, monkeypatch):
+def load_delivery_sensors(runtime, monkeypatch):
     from types import ModuleType
 
     class Entity:
@@ -391,7 +393,11 @@ def test_new_entities_stable_ids_and_latest_summary_only(runtime, monkeypatch):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     runtime.coordinator.daily_delivery = runtime.create()
-    entities = module.daily_advice_entities(runtime.coordinator, runtime.entry)
+    return module.daily_advice_entities(runtime.coordinator, runtime.entry)
+
+
+def test_new_entities_stable_ids_and_latest_summary_only(runtime, monkeypatch):
+    entities = load_delivery_sensors(runtime, monkeypatch)
     assert [entity._attr_unique_id for entity in entities] == ["test_daily_energy_advice", "test_best_consumption_window",
                                                             "test_daily_notification_status", "test_daily_energy_performance"]
     for entity in entities[-2:]:
@@ -399,3 +405,50 @@ def test_new_entities_stable_ids_and_latest_summary_only(runtime, monkeypatch):
         assert "days" not in entity.extra_state_attributes
         assert TARGET not in str(entity.extra_state_attributes)
     assert entities[-1].native_value == "storage_error"
+
+
+def test_notification_sensor_skips_performance_and_service_enumeration(runtime, monkeypatch):
+    entities = load_delivery_sensors(runtime, monkeypatch)
+    sensor = entities[-2]
+    delivery = sensor.delivery
+    delivery._loaded = True
+    delivery.status = "scheduled"
+    combined = delivery.snapshot()
+    monkeypatch.setattr(runtime.delivery_module, "performance_summary", Mock(side_effect=AssertionError("unused history scan")))
+    runtime.hass.services.async_services = Mock(side_effect=AssertionError("enumerated all services"))
+    assert sensor.native_value == "scheduled"
+    assert sensor.extra_state_attributes == {k:v for k,v in combined.items() if k not in ("performance", "notification_state")}
+    assert "performance" not in sensor.extra_state_attributes
+    # No state/attribute cache hides consent changes between successive reads.
+    runtime.entry.options[CONF_DAILY_NOTIFY_CONSENT] = False
+    assert sensor.native_value == "awaiting_consent"
+    runtime.entry.options[CONF_DAILY_NOTIFY_CONSENT] = True
+    assert sensor.native_value == "scheduled"
+    runtime.entry.options[CONF_DAILY_NOTIFY_ENABLED] = False
+    assert sensor.native_value == "disabled"
+    runtime.entry.options[CONF_DAILY_NOTIFY_ENABLED] = True
+    runtime.entry.options[CONF_DAILY_NOTIFY_TIME] = "10:00:00"
+    assert sensor.extra_state_attributes["send_time"] == "10:00:00"
+    runtime.entry.options[CONF_DAILY_NOTIFY_TARGET] = "notify.mobile_app_other"
+    assert sensor.native_value == "awaiting_consent"
+    runtime.entry.options[DAILY_CONSENT_TARGET] = "notify.mobile_app_other"
+    assert sensor.native_value == "invalid_target"
+    runtime.entry.options[CONF_DAILY_NOTIFY_TARGET] = TARGET
+    runtime.entry.options[DAILY_CONSENT_TARGET] = TARGET
+    assert sensor.native_value == "scheduled"
+    runtime.hass.services.has_service.side_effect = lambda *_: False
+    assert sensor.native_value == "invalid_target"
+    runtime.hass.services.has_service.side_effect = lambda *_: True
+    delivery.status = "storage_error"
+    assert sensor.native_value == "storage_error"
+    assert TARGET not in str(sensor.extra_state_attributes)
+
+
+def test_performance_sensor_does_not_resolve_notification_targets(runtime, monkeypatch):
+    sensor = load_delivery_sensors(runtime, monkeypatch)[-1]
+    sensor.delivery._loaded = True
+    expected = sensor.delivery.snapshot()["performance"]
+    runtime.hass.services.has_service = Mock(side_effect=AssertionError("unneeded notification lookup"))
+    runtime.hass.services.async_services = Mock(side_effect=AssertionError("unneeded service enumeration"))
+    assert sensor.native_value == expected["state"]
+    assert sensor.extra_state_attributes == {**expected, "stored_days":0, "retention_days":30, "storage_state":"ready"}

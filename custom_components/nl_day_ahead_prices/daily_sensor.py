@@ -38,14 +38,16 @@ class DailyDeliverySensor(CoordinatorEntity, SensorEntity):
 
     @property
     def native_value(self):
-        result = self.delivery.snapshot()
+        result = (self.delivery.notification_snapshot() if self.key == "daily_notification_status"
+                  else self.delivery.performance_snapshot())
         if self.key == "daily_notification_status":
             return result["notification_state"]
         return result["performance"]["state"] if result["storage_state"] == "ready" else "storage_error"
 
     @property
     def extra_state_attributes(self):
-        result = self.delivery.snapshot()
+        result = (self.delivery.notification_snapshot() if self.key == "daily_notification_status"
+                  else self.delivery.performance_snapshot())
         if self.key == "daily_energy_performance":
             return {**result["performance"], "retention_days": result["retention_days"], "stored_days": result["stored_days"],
                     "storage_state": result["storage_state"]}

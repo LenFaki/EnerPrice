@@ -6,11 +6,11 @@
 
 **Taal:** [English](README.md) | Nederlands
 
-**EnerPrice 2.7:** Powerpeers-contractinstellingen en Belgische marktprijsplanning,
+**EnerPrice 2.7.1:** Powerpeers-contractinstellingen en Belgische marktprijsplanning,
 met de prestatieoplossing uit v2.6.10. De optionele Dagelijkse Energieadviseur
 blijft beschikbaar in NL-modus. Potentieel voordeel is geen bewezen besparing.
 
-[Releasenotities](docs/releases/v2.7.0.md) · [Handleiding](docs/enerprice-v2-6-gebruikershandleiding.md) · [Documentatieoverzicht](docs/README.md)
+[Releasenotities](docs/releases/v2.7.1.md) · [Handleiding](docs/enerprice-v2-6-gebruikershandleiding.md) · [Documentatieoverzicht](docs/README.md)
 
 EnerPrice is een HACS-compatibele custom integratie voor Home Assistant voor
 Nederlandse dynamische stroomcontracten en Belgische marktprijzen. De integratie heette eerder **NL Day
