@@ -307,7 +307,9 @@ Findings create/update/reopen it; healthy results update/close it. A healthy
 first run creates nothing. Exit 1 is not a failed workflow. It never changes
 tariffs, verification dates, provenance, revisions or repository files. No
 supplier website is fetched. The existing version-gated release job is unchanged;
-manifest and project remain 2.1.1.
+the audit does not change the manifest or project version.
+The upstream guard must match `LenFaki/EnerPrice`; forks cannot run the
+issue-writing job. A skipped audit is not evidence that tariffs are current.
 
 Maintenance is human work: establish contract scope, complete amounts and VAT,
 actual effective dates, and primary-source evidence. Preserve historical periods

@@ -281,6 +281,8 @@ def test_workflow_security_schedule_and_release_job_unchanged():
     assert "contents: write" not in workflow
     assert "issues: write" in workflow and "contents: read" in workflow
     assert "cancel-in-progress: false" in workflow
+    assert "github.repository == 'LenFaki/EnerPrice'" in workflow
+    assert "LenFaki/home-assistant-nl-day-ahead-prices" not in workflow
     assert "github.ref == 'refs/heads/main'" in workflow
     assert 'if [ "$status" -gt 1 ]' in workflow
     assert "pull_request_target" not in workflow + ci
