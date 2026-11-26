@@ -1,6 +1,6 @@
 # EnerPrice documentation / Documentatie
 
-Current branch documentation: **v2.7.0**. The [GitHub releases page](https://github.com/LenFaki/EnerPrice/releases)
+Current branch documentation: **v2.7.1**. The [GitHub releases page](https://github.com/LenFaki/EnerPrice/releases)
 shows the published version; preparing documentation in a PR does not publish a release.
 
 | Subject / Onderwerp | Documentation / Documentatie |
@@ -11,6 +11,7 @@ shows the published version; preparing documentation in a PR does not publish a 
 | Belgian market / Belgische markt | [Wholesale-only setup, available services and exclusions](belgium-support-plan.md) |
 | Dashboard examples / Dashboardvoorbeelden | [English recipes](dashboard-recipes.md) · [Nederlandse voorbeelden](dashboard-recipes.nl.md) |
 | NL supplier tariffs | [Registry, provenance and troubleshooting](supplier-tariff-registry.md) |
+| v2.7.1 maintenance / Onderhoud | [Bilingual patch notes](releases/v2.7.1.md) |
 | v2.7.0 changes / Wijzigingen | [Bilingual release notes](releases/v2.7.0.md) · [Changelog](../CHANGELOG.md) |
 | Release procedure | [Maintainer instructions](releases.md) |
 

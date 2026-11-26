@@ -6,11 +6,11 @@
 
 **Language:** English | [Nederlands](README.nl.md)
 
-**EnerPrice 2.7:** Powerpeers contract setup and Belgian wholesale-price planning,
+**EnerPrice 2.7.1:** Powerpeers contract setup and Belgian wholesale-price planning,
 built on the v2.6.10 advisor performance fixes. Optional Daily Energy Advisor
 remains available in NL mode. Potential savings are not verified realized savings.
 
-[Release notes](docs/releases/v2.7.0.md) · [User guide](docs/enerprice-v2-6-user-guide.md) · [Documentation index](docs/README.md)
+[Release notes](docs/releases/v2.7.1.md) · [User guide](docs/enerprice-v2-6-user-guide.md) · [Documentation index](docs/README.md)
 
 [![GitHub Release](https://img.shields.io/github/v/release/LenFaki/EnerPrice?style=flat-square)](https://github.com/LenFaki/EnerPrice/releases)
 [![Status](https://img.shields.io/badge/status-stable-green.svg?style=flat-square)](https://github.com/LenFaki/EnerPrice)

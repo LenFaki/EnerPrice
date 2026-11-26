@@ -1,12 +1,12 @@
 # Changelog
 
-## Unreleased
+## 2.7.1 - 2026-11-26
 
 ### Performance
 - Read notification-status attributes without calculating unused energy-performance history or enumerating all Home Assistant services. Performance sensors independently read their own summary; notification consent and target availability remain live.
 - This removes avoidable work but does not establish the cause of the two isolated slow entity updates tracked in #104.
 
-## 2.7.0 - planned
+## 2.7.0 - 2026-11-24
 
 ### Added
 - Customer-confirmed Powerpeers contract setup, quarter-hour auto resolution and dated export estimates (including 2027–2029 minimum).
