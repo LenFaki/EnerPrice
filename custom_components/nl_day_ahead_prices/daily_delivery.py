@@ -142,15 +142,38 @@ class DailyAdvisorDelivery:
     def options(self):
         return {**self.entry.data, **self.entry.options}
 
-    def snapshot(self):
-        gate = delivery_gate(self.options, notification_targets(self.hass))
+    def _summary_metadata(self, options):
+        return {"retention_days": options.get(CONF_DAILY_RETENTION_DAYS, 30),
+                "stored_days": len(self.history["days"]),
+                "storage_state": "ready" if self._loaded else "unavailable"}
+
+    def notification_snapshot(self):
+        """Read current delivery settings without scanning history or all services."""
+        options = self.options
+        # Preserve consent/disabled precedence. Only resolve the selected target
+        # when an otherwise valid configuration needs an availability check.
+        gate = delivery_gate(options, ())
+        target = options.get(CONF_DAILY_NOTIFY_TARGET)
+        if gate == "invalid_target" and isinstance(target, str):
+            domain, _, service = target.partition(".")
+            if (domain == "notify" and (service == "persistent_notification" or service.startswith("mobile_app_"))
+                    and self.hass.services.has_service(domain, service)):
+                gate = "scheduled"
         state = self.status if gate == "scheduled" else gate
-        result = performance_summary(self.history, dt_util.utcnow().astimezone(AMSTERDAM).date())
         return {"notification_state": state, "notification_date": self.history["notification_date"],
-                "notification_result": self.history["notification_result"], "send_time": self.options.get(CONF_DAILY_NOTIFY_TIME, "08:00:00"),
-                "time_zone": self.hass.config.time_zone, "retention_days": self.options.get(CONF_DAILY_RETENTION_DAYS, 30),
-                "stored_days": len(self.history["days"]), "storage_state": "ready" if self._loaded else "unavailable",
-                "performance": result}
+                "notification_result": self.history["notification_result"],
+                "send_time": options.get(CONF_DAILY_NOTIFY_TIME, "08:00:00"),
+                "time_zone": self.hass.config.time_zone, **self._summary_metadata(options)}
+
+    def performance_snapshot(self):
+        """Build performance data only for consumers which display it."""
+        return {**self._summary_metadata(self.options),
+                "performance": performance_summary(self.history, dt_util.utcnow().astimezone(AMSTERDAM).date())}
+
+    def snapshot(self):
+        """Keep the combined snapshot contract for existing callers."""
+        return {**self.notification_snapshot(),
+                "performance": performance_summary(self.history, dt_util.utcnow().astimezone(AMSTERDAM).date())}
 
     async def async_start(self):
         try:

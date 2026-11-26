@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Performance
+- Read notification-status attributes without calculating unused energy-performance history or enumerating all Home Assistant services. Performance sensors independently read their own summary; notification consent and target availability remain live.
+- This removes avoidable work but does not establish the cause of the two isolated slow entity updates tracked in #104.
+
 ## 2.7.0 - planned
 
 ### Added
