@@ -172,7 +172,7 @@ def test_revision_guard(change, revision_delta, valid):
 
 def test_revision_downgrade_and_semantic_equality():
     before = payload()
-    before["revision"] = 4
+    before["revision"] = 5
     with pytest.raises(ValueError, match="decrease"):
         audit.check_revision(payload(), before)
     after = json.loads(json.dumps(before, sort_keys=True))
