@@ -374,7 +374,7 @@
           "source_type": "official",
           "source_url": "https://pure-energie.nl/groene-stroom/tarieven",
           "last_verified": "2026-11-27",
-          "notes": "Pure Energie tariffs from 2027-01-01 as communicated to customers: purchase fee EUR 0.01936/kWh including 21% VAT, sell fee EUR 0.01549/kWh with 0% VAT, EUR 6.99/month fixed supply costs per connection. Export pays the market price excluding VAT minus the sell fee. The gas purchase fee (EUR 0.10527/m3 including VAT) is not modeled. Settlement resolution retained from the previous period. Check Mijn Pure Energie or your contract.",
+          "notes": "Pure Energie tariffs from 2027-01-01 as communicated to customers: purchase fee EUR 0.01936/kWh including 21% VAT, sell fee EUR 0.01549/kWh with 0% VAT, EUR 6.99/month fixed supply costs per connection. Export pays the market price excluding VAT minus the sell fee. Settlement resolution retained from the previous period. Check Mijn Pure Energie or your contract.",
           "feed_in_fee": 0,
           "imbalance_fee": null,
           "profile_version": 2,
